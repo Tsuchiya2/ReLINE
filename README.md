@@ -148,8 +148,59 @@ For detailed testing documentation, see [TESTING.md](TESTING.md).
 - Node.js 20+ and npm
 - MySQL 8.0+
 - LINE Developer Account ([Create one here](https://developers.line.biz/))
+- Docker & Docker Compose (optional, for containerized development)
 
-### Installation
+### 🐳 Docker Setup (Recommended)
+
+The easiest way to get started is using Docker:
+
+1. **Clone the repository**
+
+```bash
+git clone https://github.com/yourusername/cat_salvages_the_relationship.git
+cd cat_salvages_the_relationship
+```
+
+2. **Configure environment variables**
+
+Create a `.env` file or set up `config/credentials.yml.enc` with your LINE API keys.
+
+3. **Start the application**
+
+```bash
+docker compose up
+```
+
+This will:
+- Start MySQL 8.0 database container
+- Build and start the Rails application
+- Run the app at [http://localhost:3000](http://localhost:3000)
+
+**Useful Docker commands:**
+
+```bash
+# Start in detached mode
+docker compose up -d
+
+# View logs
+docker compose logs -f web
+
+# Run Rails console
+docker compose exec web bin/rails console
+
+# Run tests
+docker compose exec web bundle exec rspec
+
+# Stop containers
+docker compose down
+
+# Rebuild after Gemfile/package.json changes
+docker compose build
+```
+
+---
+
+### Local Installation (Alternative)
 
 1. **Clone the repository**
 
