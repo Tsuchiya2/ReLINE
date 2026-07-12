@@ -91,7 +91,7 @@ All authentication events are logged in **JSON format** with the following field
   "result": "success",
   "reason": null,
 
-  "rails_version": "8.1.1",
+  "rails_version": "8.1.3",
   "sdk_version": "2.0.0",
   "timestamp": "2025-11-26T10:30:00Z"
 }

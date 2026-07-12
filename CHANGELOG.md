@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed - Ruby 4.0 / Rails 8.1.3 Upgrade (2026-07-12)
+
+#### Runtime & Framework
+- **Ruby**: 3.4.6 → 4.0.5 (`.ruby-version`, `Gemfile`, `Dockerfile`, CI)
+- **Rails**: 8.1.1 → 8.1.3
+- **Gems**: `bundle update` で全gemを最新化（Puma 8.0 / RuboCop 1.88 / slim-rails 4.0 / rspec-rails 8.0.4 / selenium-webdriver 4.46 など）
+
+#### Fixed
+- Ruby 4.0 で削除された `CGI.parse` を `Rack::Utils.parse_query` に置換（`spec/requests/manifest_spec.rb`）
+- Apple Silicon の Docker で system spec が実行できるよう Debian の `chromium` + `chromium-driver` をイメージに追加し、存在時は Capybara がそれを使用（Chrome for Testing に linux/arm64 版がないため）
+
+#### Verified
+- RSpec: 715 examples, 0 failures
+- RuboCop: 145 files, no offenses
+
 ### Added - LINE Bot SDK Modernization (2025-11-17)
 
 #### New Features

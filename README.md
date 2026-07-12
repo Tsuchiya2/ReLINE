@@ -57,7 +57,7 @@
 | ![Ruby](https://img.shields.io/badge/Ruby-4.0.5-CC342D?style=flat&logo=ruby&logoColor=white) | 4.0.5 | コア言語 |
 | ![Rails](https://img.shields.io/badge/Rails-8.1.3-CC0000?style=flat&logo=ruby-on-rails&logoColor=white) | 8.1.3 | Webフレームワーク |
 | ![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=flat&logo=mysql&logoColor=white) | 8.0+ | データベース（全環境） |
-| ![LINE](https://img.shields.io/badge/LINE_Bot_API-2.0-00C300?style=flat&logo=line&logoColor=white) | 2.0 | メッセージング連携 |
+| ![LINE](https://img.shields.io/badge/LINE_Bot_API-2.x-00C300?style=flat&logo=line&logoColor=white) | 2.x | メッセージング連携 |
 
 #### コアGems
 
@@ -241,7 +241,7 @@ docker compose exec web bin/rails routes
 
 - [LINE Messaging APIドキュメント](https://developers.line.biz/ja/docs/messaging-api/)
 - [Rails 8.1ガイド](https://railsguides.jp/)
-- [Ruby 3.4ドキュメント](https://docs.ruby-lang.org/ja/3.4.0/)
+- [Ruby 4.0ドキュメント](https://docs.ruby-lang.org/ja/latest/)
 
 ---
 
