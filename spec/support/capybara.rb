@@ -6,6 +6,14 @@ require 'selenium-webdriver'
 Capybara.default_max_wait_time = 5
 Capybara.server = :puma, { Silent: true }
 
+# Prefer system Chromium/chromedriver when installed (Docker on arm64,
+# where Selenium Manager cannot download Chrome for Testing).
+# On CI (GitHub Actions), these paths are absent and Selenium Manager
+# resolves Chrome/chromedriver automatically as before.
+SYSTEM_CHROMIUM_BIN = ['/usr/bin/chromium', '/usr/bin/chromium-browser'].find { |path| File.exist?(path) }
+SYSTEM_CHROMEDRIVER = ('/usr/bin/chromedriver' if File.exist?('/usr/bin/chromedriver')).freeze
+Selenium::WebDriver::Chrome::Service.driver_path = SYSTEM_CHROMEDRIVER if SYSTEM_CHROMEDRIVER
+
 # Configure Chrome options for CI environment
 Capybara.register_driver :headless_chrome do |app|
   options = Selenium::WebDriver::Chrome::Options.new
@@ -15,6 +23,7 @@ Capybara.register_driver :headless_chrome do |app|
   options.add_argument('--disable-gpu')
   options.add_argument('--window-size=1920,1080')
   options.add_argument('--disable-blink-features=AutomationControlled')
+  options.binary = SYSTEM_CHROMIUM_BIN if SYSTEM_CHROMIUM_BIN
 
   Capybara::Selenium::Driver.new(app, browser: :chrome, options: options)
 end
@@ -34,6 +43,7 @@ Capybara.register_driver :headless_chrome_pwa do |app|
 
   # Enable logging preferences for debugging
   options.logging_prefs = { browser: 'ALL' }
+  options.binary = SYSTEM_CHROMIUM_BIN if SYSTEM_CHROMIUM_BIN
 
   Capybara::Selenium::Driver.new(
     app,

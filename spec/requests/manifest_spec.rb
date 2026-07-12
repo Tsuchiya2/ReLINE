@@ -239,10 +239,10 @@ RSpec.describe 'Manifest', type: :request do
 
       it 'includes proper UTM tracking parameters' do
         uri = URI.parse(manifest['start_url'])
-        query = CGI.parse(uri.query)
+        query = Rack::Utils.parse_query(uri.query)
 
-        expect(query['utm_source']).to eq(['pwa'])
-        expect(query['utm_medium']).to eq(['homescreen'])
+        expect(query['utm_source']).to eq('pwa')
+        expect(query['utm_medium']).to eq('homescreen')
       end
     end
 

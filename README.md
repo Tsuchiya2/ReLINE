@@ -2,8 +2,8 @@
 
 # 🐱 ReLINE - 猫メッセンジャーBot
 
-[![Ruby](https://img.shields.io/badge/Ruby-3.4.6-CC342D?style=flat&logo=ruby&logoColor=white)](https://www.ruby-lang.org/)
-[![Rails](https://img.shields.io/badge/Rails-8.1.1-CC0000?style=flat&logo=ruby-on-rails&logoColor=white)](https://rubyonrails.org/)
+[![Ruby](https://img.shields.io/badge/Ruby-4.0.5-CC342D?style=flat&logo=ruby&logoColor=white)](https://www.ruby-lang.org/)
+[![Rails](https://img.shields.io/badge/Rails-8.1.3-CC0000?style=flat&logo=ruby-on-rails&logoColor=white)](https://rubyonrails.org/)
 [![LINE](https://img.shields.io/badge/LINE-Messaging_API-00C300?style=flat&logo=line&logoColor=white)](https://developers.line.biz/en/services/messaging-api/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -54,8 +54,8 @@
 
 | 技術 | バージョン | 用途 |
 |------|-----------|------|
-| ![Ruby](https://img.shields.io/badge/Ruby-3.4.6-CC342D?style=flat&logo=ruby&logoColor=white) | 3.4.6 | コア言語 |
-| ![Rails](https://img.shields.io/badge/Rails-8.1.1-CC0000?style=flat&logo=ruby-on-rails&logoColor=white) | 8.1.1 | Webフレームワーク |
+| ![Ruby](https://img.shields.io/badge/Ruby-4.0.5-CC342D?style=flat&logo=ruby&logoColor=white) | 4.0.5 | コア言語 |
+| ![Rails](https://img.shields.io/badge/Rails-8.1.3-CC0000?style=flat&logo=ruby-on-rails&logoColor=white) | 8.1.3 | Webフレームワーク |
 | ![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?style=flat&logo=mysql&logoColor=white) | 8.0+ | データベース（全環境） |
 | ![LINE](https://img.shields.io/badge/LINE_Bot_API-2.0-00C300?style=flat&logo=line&logoColor=white) | 2.0 | メッセージング連携 |
 
@@ -118,8 +118,6 @@
 ---
 
 ## 📊 テストカバレッジ
-
-![テストカバレッジ](/readme-images/coverage.webp)
 
 - **モデルスペック** - ビジネスロジックの包括的なユニットテスト
 - **システムスペック** - **Selenium**によるエンドツーエンド統合テスト
@@ -238,10 +236,6 @@ docker compose exec web bin/rails routes
 ---
 
 ## 📚 リソース
-
-### ブログ記事
-
-- 📝 [RailsでLINE Botを構築する - 初心者向けガイド](https://qiita.com/Tsuchiy_2/items/4e8c038f58c23b57b0be)（日本語）
 
 ### ドキュメント
 

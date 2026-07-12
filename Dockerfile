@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM ruby:3.4.6-slim
+FROM ruby:4.0.5-slim
 
 # Install OS deps: build tools, Node.js/Yarn, MySQL client libs, Playwright dependencies
 RUN apt-get update -qq \
@@ -45,6 +45,13 @@ RUN npm ci
 
 # Install Playwright browsers
 RUN npx playwright install chromium --with-deps
+
+# System Chromium + chromedriver for Selenium system specs.
+# Chrome for Testing has no linux/arm64 build, so Selenium Manager's
+# auto-download fails on Apple Silicon; Debian's packages support arm64.
+RUN apt-get update -qq \
+  && apt-get install -y --no-install-recommends chromium chromium-driver \
+  && rm -rf /var/lib/apt/lists/*
 
 # Copy the rest of the app
 COPY . .
