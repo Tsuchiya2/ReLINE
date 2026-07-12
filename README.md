@@ -269,13 +269,3 @@ docker compose exec web bin/rails routes
 
 - GitHub: [@Tsuchiya2](https://github.com/Tsuchiya2)
 - Qiita: [@Tsuchiy_2](https://qiita.com/Tsuchiy_2)
-
----
-
-<div align="center">
-
-**Rubyと愛情を込めて開発しました**
-
-⭐ このリポジトリが役に立ったらスターをお願いします！
-
-</div>
