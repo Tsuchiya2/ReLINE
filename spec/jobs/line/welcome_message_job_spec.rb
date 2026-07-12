@@ -20,4 +20,18 @@ RSpec.describe Line::WelcomeMessageJob, type: :job do
     expect(adapter).to have_received(:push_message).with('GROUP1', message)
     expect(PrometheusMetrics).to have_received(:track_message_send).with('success')
   end
+
+  context 'when pushing the message fails' do
+    before do
+      allow(adapter).to receive(:push_message).and_raise(StandardError.new('LINE API down'))
+      allow(Rails.logger).to receive(:error)
+    end
+
+    it 'logs the error, tracks failure and re-raises' do
+      expect { described_class.perform_now('GROUP1', message) }.to raise_error(StandardError, 'LINE API down')
+
+      expect(Rails.logger).to have_received(:error).with(/WelcomeMessageJob failed for GROUP1: LINE API down/)
+      expect(PrometheusMetrics).to have_received(:track_message_send).with('error')
+    end
+  end
 end
