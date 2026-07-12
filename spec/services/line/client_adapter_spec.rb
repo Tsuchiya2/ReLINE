@@ -87,6 +87,20 @@ RSpec.describe Line::SdkV2Adapter do
       expect(Line::Bot::Client).to have_received(:new)
     end
 
+    it 'passes each credential to the client config block' do
+      config = double('config')
+      allow(config).to receive(:channel_id=)
+      allow(config).to receive(:channel_secret=)
+      allow(config).to receive(:channel_token=)
+      allow(Line::Bot::Client).to receive(:new).and_yield(config).and_return(mock_client)
+
+      described_class.new(credentials)
+
+      expect(config).to have_received(:channel_id=).with('test_channel_id')
+      expect(config).to have_received(:channel_secret=).with('test_channel_secret')
+      expect(config).to have_received(:channel_token=).with('test_channel_token')
+    end
+
     it 'raises ArgumentError when channel_id is missing' do
       invalid_credentials = credentials.except(:channel_id)
 

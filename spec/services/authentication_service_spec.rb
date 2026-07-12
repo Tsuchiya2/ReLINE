@@ -129,6 +129,35 @@ RSpec.describe AuthenticationService do
       end
     end
 
+    context 'when authentication fails due to a locked account' do
+      let(:locked_result) { AuthResult.failed(:account_locked, user: user) }
+
+      before do
+        allow(password_provider).to receive(:authenticate).and_return(locked_result)
+      end
+
+      it 'records the locked-account metric' do
+        expect(AUTH_LOCKED_ACCOUNTS_TOTAL).to receive(:increment).with(labels: { provider: :password })
+
+        described_class.authenticate(:password, email: 'test@example.com', password: 'secret123')
+      end
+    end
+
+    context 'when recording metrics raises' do
+      before do
+        allow(password_provider).to receive(:authenticate).and_return(AuthResult.success(user: user))
+        allow(AUTH_ATTEMPTS_TOTAL).to receive(:increment).and_raise(StandardError.new('prometheus down'))
+        allow(Rails.logger).to receive(:error)
+      end
+
+      it 'logs the failure and does not break authentication' do
+        result = described_class.authenticate(:password, email: 'test@example.com', password: 'secret123')
+
+        expect(result.success?).to be true
+        expect(Rails.logger).to have_received(:error).with(/Failed to record authentication metrics/)
+      end
+    end
+
     context 'when MFA is pending' do
       let(:pending_result) { AuthResult.pending_mfa(user: user) }
 

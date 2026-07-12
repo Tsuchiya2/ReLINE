@@ -1,3 +1,33 @@
+# SimpleCov must start before any application code is loaded so that every file
+# (including those evaluated during boot) is tracked accurately.
+if ENV['CI'] == 'true' || ENV['COVERAGE'] == 'true'
+  require 'simplecov'
+  require 'simplecov-console'
+
+  SimpleCov.start 'rails' do
+    # Measure branch coverage in addition to line coverage
+    enable_coverage :branch
+
+    # Set minimum coverage threshold (line and branch)
+    minimum_coverage line: 100, branch: 100
+
+    # Filters - exclude these directories from coverage
+    add_filter '/spec/'
+    add_filter '/config/'
+    add_filter '/vendor/'
+    add_filter '/test/'
+
+    # Coverage output formatters
+    formatter SimpleCov::Formatter::MultiFormatter.new([
+                                                         SimpleCov::Formatter::HTMLFormatter,
+                                                         SimpleCov::Formatter::Console
+                                                       ])
+
+    # Track files even if they are not loaded
+    track_files '{app,lib}/**/*.rb'
+  end
+end
+
 require 'spec_helper'
 ENV['RAILS_ENV'] = 'test' # Force test environment
 require_relative '../config/environment'
@@ -17,32 +47,6 @@ RSpec.configure do |config|
   config.filter_rails_from_backtrace!
   config.include FactoryBot::Syntax::Methods
   config.include ActiveSupport::Testing::TimeHelpers
-end
-
-# SimpleCov configuration
-if ENV['CI'] == 'true' || ENV['COVERAGE'] == 'true'
-  require 'simplecov'
-  require 'simplecov-console'
-
-  SimpleCov.start 'rails' do
-    # Set minimum coverage threshold
-    minimum_coverage 75
-
-    # Filters - exclude these directories from coverage
-    add_filter '/spec/'
-    add_filter '/config/'
-    add_filter '/vendor/'
-    add_filter '/test/'
-
-    # Coverage output formatters
-    formatter SimpleCov::Formatter::MultiFormatter.new([
-                                                         SimpleCov::Formatter::HTMLFormatter,
-                                                         SimpleCov::Formatter::Console
-                                                       ])
-
-    # Track files even if they are not loaded
-    track_files '{app,lib}/**/*.rb'
-  end
 end
 
 # Load support files

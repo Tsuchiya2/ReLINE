@@ -2,187 +2,124 @@
 
 require 'rails_helper'
 
-# NOTE: These tests are for the migration tool that was used to migrate from Sorcery to Rails 8 authentication.
-# Since the migration is complete and crypted_password column has been removed, these tests are now skipped.
-RSpec.describe DataMigrationValidator, skip: 'Migration complete - crypted_password column removed' do
+# The Operator table no longer has the legacy `crypted_password` column, so these
+# specs drive the validator through doubles/stubs instead of real ActiveRecord
+# queries. This keeps the migration tooling covered without depending on a schema
+# that has since been removed.
+RSpec.describe DataMigrationValidator do
   describe '.generate_checksum' do
-    before do
-      # Clean up any existing operators to prevent email uniqueness conflicts
-      Operator.delete_all
+    let(:model_class) do
+      instance_double(ActiveRecord::Relation).tap do |model|
+        allow(model).to receive(:pluck)
+          .with(:id, :email, :crypted_password, :password_digest)
+          .and_return(records)
+      end
     end
 
-    let!(:operator1) do
-      Operator.create!(
-        name: 'Test User 1',
-        email: 'test1@example.com',
-        password: 'password123',
-        password_confirmation: 'password123',
-        role: :operator
-      )
+    let(:records) do
+      [
+        [1, 'a@example.com', nil, 'digest1'],
+        [2, 'b@example.com', nil, 'digest2']
+      ]
     end
 
-    let!(:operator2) do
-      Operator.create!(
-        name: 'Test User 2',
-        email: 'test2@example.com',
-        password: 'password456',
-        password_confirmation: 'password456',
-        role: :operator
-      )
+    it 'returns one checksum per record' do
+      expect(described_class.generate_checksum(model_class).size).to eq(2)
     end
 
-    it 'generates checksums for all records' do
-      checksums = described_class.generate_checksum(Operator)
-
-      expect(checksums).to be_an(Array)
-      expect(checksums.size).to eq(2)
+    it 'returns SHA256 hex digests' do
+      expect(described_class.generate_checksum(model_class)).to all(match(/\A[a-f0-9]{64}\z/))
     end
 
-    it 'generates SHA256 checksums' do
-      checksums = described_class.generate_checksum(Operator)
-
-      expect(checksums).to all(match(/\A[a-f0-9]{64}\z/))
+    it 'is deterministic for identical data' do
+      first = described_class.generate_checksum(model_class)
+      second = described_class.generate_checksum(model_class)
+      expect(first).to eq(second)
     end
 
-    it 'generates consistent checksums for same data' do
-      checksums1 = described_class.generate_checksum(Operator)
-      checksums2 = described_class.generate_checksum(Operator)
+    it 'produces different checksums when the underlying data differs' do
+      other = instance_double(ActiveRecord::Relation)
+      allow(other).to receive(:pluck)
+        .with(:id, :email, :crypted_password, :password_digest)
+        .and_return([[1, 'a@example.com', nil, 'CHANGED']])
 
-      expect(checksums1).to eq(checksums2)
-    end
-
-    it 'generates different checksums when data changes' do
-      checksums_before = described_class.generate_checksum(Operator)
-
-      operator1.update!(crypted_password: 'new_password_hash')
-
-      checksums_after = described_class.generate_checksum(Operator)
-
-      expect(checksums_before).not_to eq(checksums_after)
+      expect(described_class.generate_checksum(model_class))
+        .not_to eq(described_class.generate_checksum(other))
     end
   end
 
   describe '.validate_migration' do
-    let(:checksums1) { %w[abc123 def456 ghi789] }
-    let(:checksums2) { %w[abc123 def456 ghi789] }
+    let(:before_checksums) { %w[abc123 def456 ghi789] }
 
-    context 'when checksums match' do
-      it 'returns true' do
-        result = described_class.validate_migration(checksums1, checksums2)
-
-        expect(result).to be true
-      end
+    it 'returns true when checksums are identical' do
+      expect(described_class.validate_migration(before_checksums, before_checksums.dup)).to be true
     end
 
-    context 'when records are lost' do
-      let(:checksums_after) { %w[abc123 def456] }
-
-      it 'raises error with missing count' do
-        expect { described_class.validate_migration(checksums1, checksums_after) }
-          .to raise_error(RuntimeError, 'Migration validation failed: 1 records lost')
-      end
+    it 'returns true when the order changes but the data is the same' do
+      expect(described_class.validate_migration(before_checksums, %w[ghi789 abc123 def456])).to be true
     end
 
-    context 'when unexpected records are added' do
-      let(:checksums_after) { %w[abc123 def456 ghi789 jkl012] }
-
-      it 'raises error with added count' do
-        expect { described_class.validate_migration(checksums1, checksums_after) }
-          .to raise_error(RuntimeError, 'Migration validation failed: 1 unexpected records added')
-      end
+    it 'raises when records are lost' do
+      expect { described_class.validate_migration(before_checksums, %w[abc123 def456]) }
+        .to raise_error(RuntimeError, 'Migration validation failed: 1 records lost')
     end
 
-    context 'when records are modified' do
-      let(:checksums_after) { %w[abc123 def456 xyz999] }
-
-      it 'raises error about modified records' do
-        expect { described_class.validate_migration(checksums1, checksums_after) }
-          .to raise_error(RuntimeError, /Migration validation failed: \d+ records modified or corrupted/)
-      end
+    it 'raises when unexpected records are added' do
+      expect { described_class.validate_migration(before_checksums, %w[abc123 def456 ghi789 jkl012]) }
+        .to raise_error(RuntimeError, 'Migration validation failed: 1 unexpected records added')
     end
 
-    context 'when order changes but data is same' do
-      let(:checksums_after) { %w[ghi789 abc123 def456] }
-
-      it 'returns true' do
-        result = described_class.validate_migration(checksums1, checksums_after)
-
-        expect(result).to be true
-      end
+    it 'raises when records are modified but the count is unchanged' do
+      expect { described_class.validate_migration(before_checksums, %w[abc123 def456 xyz999]) }
+        .to raise_error(RuntimeError, /Migration validation failed: \d+ records modified or corrupted/)
     end
   end
 
   describe '.verify_integrity' do
+    let(:model_class) { class_double(Operator) }
+    let(:missing_relation) { instance_double(ActiveRecord::Relation, count: missing_auth) }
+    let(:duplicate_relation) { instance_double(ActiveRecord::Relation, count: duplicate_auth) }
+
     before do
-      # Clean up any existing operators to prevent email uniqueness conflicts
-      Operator.delete_all
+      allow(model_class).to receive(:count).and_return(total)
+      allow(model_class).to receive(:where)
+        .with('crypted_password IS NULL AND password_digest IS NULL')
+        .and_return(missing_relation)
+      allow(model_class).to receive(:where)
+        .with('crypted_password IS NOT NULL AND password_digest IS NOT NULL')
+        .and_return(duplicate_relation)
     end
 
-    context 'when all records have valid authentication data' do
-      let!(:operator) do
-        Operator.create!(
-          name: 'Test User',
-          email: 'test@example.com',
-          password: 'password123',
-          password_confirmation: 'password123',
-          role: :operator
-        )
-      end
+    context 'when there are no integrity issues' do
+      let(:total) { 5 }
+      let(:missing_auth) { 0 }
+      let(:duplicate_auth) { 0 }
 
-      it 'returns valid result' do
-        result = described_class.verify_integrity(Operator)
-
-        expect(result[:valid]).to be true
-        expect(result[:total_records]).to eq(1)
-        expect(result[:issues]).to be_empty
+      it 'reports a valid result' do
+        result = described_class.verify_integrity(model_class)
+        expect(result).to eq(valid: true, total_records: 5, issues: [])
       end
     end
 
-    context 'when records have missing authentication data' do
-      let!(:operator) do
-        Operator.create!(
-          name: 'Test User',
-          email: 'test@example.com',
-          password: 'password123',
-          password_confirmation: 'password123',
-          role: :operator
-        )
-      end
+    context 'when records are missing authentication data' do
+      let(:total) { 3 }
+      let(:missing_auth) { 2 }
+      let(:duplicate_auth) { 0 }
 
-      before do
-        operator.update!(crypted_password: nil, password_digest: nil)
-      end
-
-      it 'reports missing authentication data' do
-        result = described_class.verify_integrity(Operator)
-
+      it 'reports the missing authentication data issue' do
+        result = described_class.verify_integrity(model_class)
         expect(result[:valid]).to be false
-        expect(result[:issues]).to include('1 records missing authentication data')
+        expect(result[:issues]).to include('2 records missing authentication data')
       end
     end
 
-    context 'when records have duplicate authentication methods' do
-      let!(:operator) do
-        Operator.create!(
-          name: 'Test User',
-          email: 'test@example.com',
-          password: 'password123',
-          password_confirmation: 'password123',
-          role: :operator
-        )
-      end
+    context 'when records have both authentication methods' do
+      let(:total) { 3 }
+      let(:missing_auth) { 0 }
+      let(:duplicate_auth) { 1 }
 
-      before do
-        # Simulate having both authentication methods
-        operator.update!(
-          crypted_password: 'old_password_hash',
-          password_digest: operator.crypted_password
-        )
-      end
-
-      it 'reports duplicate authentication methods' do
-        result = described_class.verify_integrity(Operator)
-
+      it 'reports the duplicate authentication issue' do
+        result = described_class.verify_integrity(model_class)
         expect(result[:valid]).to be false
         expect(result[:issues]).to include('1 records have both crypted_password and password_digest')
       end
@@ -190,82 +127,30 @@ RSpec.describe DataMigrationValidator, skip: 'Migration complete - crypted_passw
   end
 
   describe '.validate_password_migration' do
+    let(:scoped) { instance_double(ActiveRecord::Relation) }
+    let(:where_chain) { instance_double(ActiveRecord::QueryMethods::WhereChain) }
+    let(:not_migrated) { instance_double(ActiveRecord::Relation, count: missing) }
+
     before do
-      # Clean up any existing operators to prevent email uniqueness conflicts
-      Operator.delete_all
+      allow(Operator).to receive(:where).with(password_digest: nil).and_return(scoped)
+      allow(scoped).to receive(:where).and_return(where_chain)
+      allow(where_chain).to receive(:not).with(crypted_password: nil).and_return(not_migrated)
     end
 
-    context 'when all operators have password_digest' do
-      let!(:operator) do
-        Operator.create!(
-          name: 'Test User',
-          email: 'test@example.com',
-          password: 'password123',
-          password_confirmation: 'password123',
-          role: :operator
-        )
-      end
-
-      before do
-        # Simulate fully migrated state (password_digest set, crypted_password cleared)
-        operator.update!(
-          password_digest: BCrypt::Password.create('password123'),
-          crypted_password: nil
-        )
-      end
+    context 'when every operator has a password_digest' do
+      let(:missing) { 0 }
 
       it 'returns true' do
-        result = described_class.validate_password_migration
-
-        expect(result).to be true
+        expect(described_class.validate_password_migration).to be true
       end
     end
 
-    context 'when operators are missing password_digest' do
-      let!(:operator) do
-        Operator.create!(
-          name: 'Test User',
-          email: 'test@example.com',
-          password: 'password123',
-          password_confirmation: 'password123',
-          role: :operator
-        )
-      end
+    context 'when some operators are missing a password_digest' do
+      let(:missing) { 2 }
 
-      before do
-        # Simulate old Sorcery format (crypted_password only)
-        operator.update!(
-          crypted_password: 'old_password_hash',
-          password_digest: nil
-        )
-      end
-
-      it 'raises error with missing count' do
+      it 'raises with the missing count' do
         expect { described_class.validate_password_migration }
-          .to raise_error(RuntimeError, 'Migration incomplete: 1 operators missing password_digest')
-      end
-    end
-
-    context 'when operators only have password_digest' do
-      let!(:operator) do
-        Operator.create!(
-          name: 'Test User',
-          email: 'test@example.com',
-          password: 'password123',
-          password_confirmation: 'password123',
-          role: :operator
-        )
-      end
-
-      before do
-        # Simulate fully migrated state (password_digest only)
-        operator.update!(crypted_password: nil)
-      end
-
-      it 'returns true' do
-        result = described_class.validate_password_migration
-
-        expect(result).to be true
+          .to raise_error(RuntimeError, 'Migration incomplete: 2 operators missing password_digest')
       end
     end
   end

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'prometheus/client'
+require 'prometheus/client/formats/text'
 
 prometheus = Prometheus::Client.registry
 

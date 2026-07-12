@@ -268,4 +268,4 @@ docker compose exec web bin/rails routes
 **Tsuchiya Yuji**
 
 - GitHub: [@Tsuchiya2](https://github.com/Tsuchiya2)
-- Qiita: [@Tsuchiy_2](https://qiita.com/Tsuchiy_2)
+- Qiita: [@Tsuchiya2](https://qiita.com/Tsuchiya2)

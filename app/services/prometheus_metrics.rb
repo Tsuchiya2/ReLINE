@@ -17,7 +17,7 @@ module PrometheusMetrics
     def track_webhook_duration(event_type, duration)
       return unless defined?(WEBHOOK_DURATION)
 
-      WEBHOOK_DURATION.observe({ event_type: event_type }, duration)
+      WEBHOOK_DURATION.observe(duration, labels: { event_type: event_type })
     end
 
     # Track webhook request
@@ -61,7 +61,7 @@ module PrometheusMetrics
       return unless defined?(LINE_API_CALLS_TOTAL) && defined?(LINE_API_DURATION)
 
       LINE_API_CALLS_TOTAL.increment(labels: { method: method, status: status })
-      LINE_API_DURATION.observe({ method: method }, duration)
+      LINE_API_DURATION.observe(duration, labels: { method: method })
     end
 
     # Track message send result
@@ -79,7 +79,7 @@ module PrometheusMetrics
     def update_group_count(count)
       return unless defined?(LINE_GROUPS_TOTAL)
 
-      LINE_GROUPS_TOTAL.set({}, count)
+      LINE_GROUPS_TOTAL.set(count)
     end
   end
 end
