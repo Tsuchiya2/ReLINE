@@ -241,7 +241,7 @@ docker compose exec web bin/rails routes
 
 - [LINE Messaging APIドキュメント](https://developers.line.biz/ja/docs/messaging-api/)
 - [Rails 8.1ガイド](https://railsguides.jp/)
-- [Ruby 4.0ドキュメント](https://docs.ruby-lang.org/ja/latest/)
+- [Ruby 4.0ドキュメント](https://docs.ruby-lang.org/ja/4.0/)
 
 ---
 
