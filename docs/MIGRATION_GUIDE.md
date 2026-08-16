@@ -16,12 +16,12 @@ This guide explains the migration from the legacy `CatLineBot` implementation to
 ### Architecture
 
 **Before (Legacy)**:
-```
+```text
 LINE Webhook → WebhooksController → CatLineBot (God Object) → LINE SDK v1.x
 ```
 
 **After (New)**:
-```
+```text
 LINE Webhook → WebhooksController → EventProcessor
                                     ├─ ClientAdapter (abstraction)
                                     ├─ GroupService (business logic)
@@ -119,7 +119,7 @@ All logs are now in JSON format with correlation IDs:
 
 ### Removed Files
 
-```
+```text
 app/models/cat_line_bot.rb  (deleted)
 app/models/concerns/message_event.rb  (deleted)
 ```

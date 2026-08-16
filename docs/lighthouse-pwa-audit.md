@@ -264,7 +264,7 @@ Additional features that improve the PWA experience and score:
 6. **Error Handling**: Graceful fallbacks at every layer
 
 **Code Organization**:
-```
+```text
 app/javascript/pwa/
 ├── config_loader.js           # Loads config from backend API
 ├── lifecycle_manager.js       # Handles install/activate events
@@ -365,7 +365,7 @@ Add app shortcuts for quick actions:
 **Target**: Strict CSP for PWA
 
 Ensure these headers in production:
-```
+```http
 Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY

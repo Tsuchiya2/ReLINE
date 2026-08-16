@@ -5,7 +5,11 @@ ReLINEのテストは、Ruby側の **RSpec** と、Service Workerモジュール
 | 対象 | フレームワーク | 設定ファイル | 実行コマンド |
 |------|----------------|--------------|--------------|
 | Rails（モデル / サービス / リクエスト / システム） | RSpec | `.rspec` / `spec/rails_helper.rb` | `bundle exec rspec` |
-| PWA Service Worker（`app/javascript/pwa/**`） | Jest | `jest.config.js` / `babel.config.json` | `npm test` |
+| Service Workerモジュール（キャッシュ戦略 / `strategy_router` / `lifecycle_manager` / `config_loader`） | Jest | `jest.config.js` / `babel.config.json` | `npm test` |
+
+`app/javascript/pwa/`配下でも`install_prompt_manager.js`と`service_worker_registration.js`は
+`app/javascript/application.js`から読み込まれるブラウザ側モジュールで、Jestの対象外です
+（`jest.config.js`の`collectCoverageFrom`を参照）。
 
 以降のコマンドはDocker環境での実行を前提としています。ローカルに直接Ruby/Nodeを用意している場合は`docker compose exec web`を除いて実行してください。
 
@@ -36,7 +40,7 @@ docker compose exec web bundle exec rspec --only-failures
 
 ### ディレクトリ構成
 
-```
+```text
 spec/
 ├── channels/     # ActionCable
 ├── controllers/  # コントローラスペック
@@ -117,7 +121,7 @@ docker compose exec web npm run test:watch
 docker compose exec web npm run test:coverage
 ```
 
-- 対象: `spec/javascript/**/*.test.js`
+- テスト対象ファイル: `spec/javascript/**/*.test.js`
 - 環境: `jsdom`（`spec/javascript/setup.js`でCache API / fetch / Service Workerグローバルをモック）
 - カバレッジ閾値: branches / functions / lines / statements すべて **80%**
 

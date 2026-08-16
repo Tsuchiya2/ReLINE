@@ -165,7 +165,7 @@ RAILS_ENV=production bundle exec rails runner "
 ## Communication Templates
 
 ### Pre-Deployment Notice
-```
+```text
 Subject: [Scheduled] Authentication System Upgrade - [DATE]
 
 We will be upgrading our authentication system on [DATE] at [TIME].
@@ -174,7 +174,7 @@ Impact: None expected. Please report any login issues immediately.
 ```
 
 ### Rollback Notice
-```
+```text
 Subject: [URGENT] Authentication Rollback in Progress
 
 We have detected issues with the new authentication system and are 
@@ -186,7 +186,7 @@ Impact: Users may experience brief login interruptions
 ```
 
 ### Post-Rollback Notice
-```
+```text
 Subject: [Resolved] Authentication System Restored
 
 The rollback has been completed successfully.

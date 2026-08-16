@@ -208,21 +208,21 @@ end
 ### Migration Validation Errors
 
 **Records Lost:**
-```
+```text
 Migration validation failed: 5 records lost
 ```
 - Meaning: 5 records were deleted during migration
 - Action: Investigate why records were lost, restore from backup
 
 **Unexpected Records Added:**
-```
+```text
 Migration validation failed: 3 unexpected records added
 ```
 - Meaning: 3 new records were created during migration
 - Action: Verify if this was intentional
 
 **Records Modified:**
-```
+```text
 Migration validation failed: 10 records modified or corrupted
 ```
 - Meaning: Data in 10 records changed unexpectedly
@@ -230,7 +230,7 @@ Migration validation failed: 10 records modified or corrupted
 
 ### Password Migration Errors
 
-```
+```text
 Migration incomplete: 25 operators missing password_digest
 ```
 - Meaning: 25 operators still have crypted_password but no password_digest
@@ -295,7 +295,7 @@ docker compose exec web bundle exec rspec spec/services/data_migration_validator
 ```
 
 Expected output:
-```
+```text
 DataMigrationValidator
   .generate_checksum
     returns one checksum per record

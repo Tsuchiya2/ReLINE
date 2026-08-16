@@ -75,7 +75,7 @@
 - **コード品質** - `rubocop`（Rails、Performance、RSpec拡張付き）
 - **テストデータ** - `factory_bot_rails`、`faker` - ファクトリとフィクスチャ生成
 - **セキュリティ** - `brakeman`、`bundler-audit` - セキュリティ脆弱性スキャン
-- **カバレッジ** - `simplecov` - 行・ブランチともに100%を必須とするカバレッジ分析
+- **カバレッジ** - `simplecov` - `COVERAGE=true`または`CI=true`での実行時に計測し、行・ブランチともに100%を必須とする
 
 ### フロントエンド
 
@@ -164,7 +164,7 @@ Webフロントエンドはインストール可能なPWAとして動作しま�
 ## 📊 テスト
 
 - **RSpec** - モデル / サービス / リクエスト / システムスペックを網羅
-- **SimpleCov** - 行・ブランチともに100%を下回るとテストが失敗
+- **SimpleCov** - `COVERAGE=true`または`CI=true`での実行時のみ計測され、行・ブランチともに100%を下回るとテストが失敗（通常の`bundle exec rspec`では計測されません）
 - **Selenium** - ヘッドレスChromeによるシステムテスト
 - **Jest** - Service Workerモジュール（`app/javascript/pwa/**`）のユニットテスト
 
@@ -197,10 +197,16 @@ cp .env.example .env
 ```
 
 LINEのチャネル情報やWebhookのコールバックパスはRailsの暗号化credentialsで管理します。
+`config/routes.rb`が`credentials.callback_route`を参照するため、**アプリケーションを起動する前に**設定してください。
+
+まだコンテナを起動していないため、`exec`ではなく`run --rm`でワンショット実行します。
 
 ```bash
-docker compose exec web bin/rails credentials:edit
+docker compose run --rm -e EDITOR=vi web bin/rails credentials:edit
 ```
+
+> すでに`docker compose up`でコンテナが起動している場合は
+> `docker compose exec -e EDITOR=vi web bin/rails credentials:edit` でも編集できます。
 
 必要なキーは以下のとおりです。
 

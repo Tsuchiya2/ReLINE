@@ -28,7 +28,7 @@ This document describes the observability setup for the Rails 8 authentication s
 
 ### Components
 
-```
+```text
 ┌─────────────┐
 │   Client    │
 └──────┬──────┘
@@ -258,7 +258,7 @@ Every HTTP request is assigned a unique **request_id** (UUID v4) for correlation
 #### How It Works
 
 1. **Client sends request** with optional `X-Request-ID` header:
-   ```
+   ```http
    GET /operator/cat_in HTTP/1.1
    Host: example.com
    X-Request-ID: abc-123-def-456
