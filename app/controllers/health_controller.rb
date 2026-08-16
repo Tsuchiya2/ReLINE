@@ -1,10 +1,4 @@
-# frozen_string_literal: true
-
-# Health check controller for Kubernetes liveness/readiness probes
-# and load balancer health checks
 class HealthController < ActionController::API
-  # GET /health
-  # Basic liveness check - returns 200 if the app is running
   def show
     render json: {
       status: 'ok',
@@ -13,8 +7,6 @@ class HealthController < ActionController::API
     }
   end
 
-  # GET /health/deep
-  # Deep health check - verifies database connectivity and other dependencies
   def deep
     checks = {
       database: check_database,
@@ -30,8 +22,6 @@ class HealthController < ActionController::API
     }, status: status
   end
 
-  # GET /health/ready
-  # Readiness check - returns 200 if the app is ready to receive traffic
   def ready
     if database_connected?
       render json: { status: 'ready', timestamp: Time.current.iso8601 }
@@ -53,7 +43,6 @@ class HealthController < ActionController::API
   end
 
   def check_disk_space
-    # Check if disk space is above 10% free
     stat = `df -h / | tail -1`.split
     usage_percent = stat[4].to_i
 

@@ -4,13 +4,12 @@ class Operator < ApplicationRecord
 
   enum :role, { operator: 0, guest: 1 }
 
-  # Configure brute force protection settings (matching Sorcery settings)
+  normalizes :email, with: ->(email) { email.to_s.strip.downcase }
+
   self.lock_retry_limit = ENV.fetch('OPERATOR_LOCK_RETRY_LIMIT', 5).to_i
   self.lock_duration = ENV.fetch('OPERATOR_LOCK_DURATION', 45).to_i.minutes
   self.lock_notifier = ->(record, ip) { SessionMailer.notice(record, ip).deliver_later }
 
-  # Password complexity regex: at least one lowercase, one uppercase, one digit
-  # Uses \A and \z anchors for secure validation (prevents regex bypass attacks)
   PASSWORD_COMPLEXITY_REGEX = /\A(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+\z/
 
   validates :name,                    presence: true, length: { in: 2..255 }
@@ -28,13 +27,4 @@ class Operator < ApplicationRecord
   validates :password,                confirmation: true, if: -> { password.present? }
   validates :password_confirmation,   presence: true, if: -> { password.present? }
   validates :role,                    presence: true
-
-  # Normalize email before validation
-  before_validation :normalize_email
-
-  private
-
-  def normalize_email
-    self.email = email.to_s.downcase.strip if email.present?
-  end
 end

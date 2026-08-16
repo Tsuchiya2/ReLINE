@@ -6,7 +6,6 @@ class Operator::BaseController < ApplicationController
 
   private
 
-  # Pundit uses this method to determine the current user for policy checks
   def pundit_user
     current_operator
   end

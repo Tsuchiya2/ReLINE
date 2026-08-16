@@ -30,14 +30,12 @@ gem 'bcrypt', '~> 3.1.7'
 # Reduces boot times through caching; required in config/boot.rb
 gem 'bootsnap', '>= 1.4.4', require: false
 gem 'slim-rails'
-# gem 'sorcery'  # Deprecated: Migrated to Rails 8 has_secure_password
 gem 'enum_help'
 gem 'line-bot-api', '~> 2.0'
 gem 'lograge', '~> 0.14'
 gem 'prometheus-client', '~> 4.0'
 gem 'pundit'
 gem 'rack-attack', '~> 6.7' # Rate limiting for login protection
-gem 'request_store', '~> 1.5'
 
 # Use mysql as the database for Active Record
 gem 'mysql2', '~> 0.5'

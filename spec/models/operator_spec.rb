@@ -28,6 +28,16 @@ RSpec.describe Operator, type: :model do
         operator[:email] = 'sample@example.com'
         expect(operator).to be_valid
       end
+
+      it '大文字や前後の空白は揃えて保存される。' do
+        operator.update!(email: '  SAMPLE@Example.com ')
+        expect(operator.email).to eq('sample@example.com')
+      end
+
+      it '表記が揃っていないメールアドレスでも検索できる。' do
+        operator.save!
+        expect(described_class.find_by(email: " #{operator.email.upcase} ")).to eq(operator)
+      end
     end
 
     context 'password' do
