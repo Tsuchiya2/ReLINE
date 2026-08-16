@@ -3,151 +3,83 @@
 require 'rails_helper'
 
 RSpec.describe Scheduler, type: :model do
-  describe '.call_messages' do
-    let(:sampler) { instance_double(Line::AlarmContentSampler) }
-
-    before do
-      allow(sampler).to receive(:available?).and_return(true, true)
-    end
-
-    it 'falls back when body is missing' do
-      allow(sampler).to receive(:sample).and_return(nil)
-
-      messages = described_class.call_messages(sampler)
-      expect(messages[0][:text]).to eq('管理者へ連絡お願いします。')
-      expect(messages[1][:text]).to eq('呼びかけメッセージを用意できなかったニャ…🐱')
-    end
-  end
-
-  describe '.wait_messages' do
-    let(:sampler) { instance_double(Line::ContentSampler) }
-
-    before do
-      allow(sampler).to receive(:available?).and_return(true, true, true)
-    end
-
-    it 'returns sample bodies when present' do
-      allow(sampler).to receive(:sample).and_return(
-        double(body: 'contact'),
-        double(body: 'free'),
-        double(body: 'text')
-      )
-
-      messages = described_class.wait_messages(sampler)
-      expect(messages.map { |m| m[:text] }).to eq(%w[contact free text])
-    end
-
-    it 'uses fallbacks when samples are nil' do
-      allow(sampler).to receive(:sample).and_return(nil, nil, nil)
-
-      messages = described_class.wait_messages(sampler)
-      expect(messages[0][:text]).to eq('いつでも声をかけてニャ！')
-      expect(messages[1][:text]).to eq('今日はどんな一日だった？')
-      expect(messages[2][:text]).to eq('もう少し仲良くなりたいニャ🐾')
-    end
-  end
-
-  describe '.scheduler' do
-    let(:sampler) { instance_double(Line::ContentSampler) }
-    let(:group) { create(:line_group) }
-
-    before do
-      # Mock Rails credentials to prevent ApplicationMailer initialization error
-      allow(Rails.application).to receive(:credentials).and_return(
-        double(operator: { email: 'test@example.com' })
-      )
-    end
-
-    it 'sends error email when required content is missing' do
-      allow(sampler).to receive(:available?).and_return(false, true, true)
-      allow(LineMailer).to receive(:error_email).and_return(double(deliver_later: true))
-      allow(PrometheusMetrics).to receive(:track_message_send)
-
-      described_class.scheduler(LineGroup.where(id: group.id), sampler, :wait)
-
-      expect(LineMailer).to have_received(:error_email).with(group.line_group_id, /コンテンツ未登録/)
-      expect(PrometheusMetrics).to have_received(:track_message_send).with('error')
-    end
-
-    context 'when a group is processed successfully' do
-      let(:group) { create(:line_group, status: :wait) }
-
-      before do
-        allow(Rails.application).to receive(:credentials).and_return(
-          double(operator: { email: 'test@example.com' })
-        )
-        allow(sampler).to receive_messages(available?: true, sample: double(body: 'message body'))
-        allow(Line::ReminderJob).to receive(:perform_later)
-        allow(PrometheusMetrics).to receive(:track_message_send)
-      end
-
-      it 'moves the group to call status and enqueues a reminder job' do
-        described_class.scheduler(LineGroup.where(id: group.id), sampler, :wait)
-
-        expect(group.reload.status).to eq('call')
-        expect(Line::ReminderJob).to have_received(:perform_later)
-          .with(group.line_group_id, kind_of(Array))
-      end
-    end
-  end
+  before { stub_line_credentials }
 
   describe '.call_notice' do
-    it 'schedules call reminders for groups due for a call' do
-      allow(LineGroup).to receive(:remind_call).and_return(:remind_groups)
-      allow(described_class).to receive(:initialize_alarm_sampler).and_return(:sampler)
-      allow(described_class).to receive(:scheduler)
+    let!(:line_group) { create(:line_group, status: :call, remind_at: Date.current) }
 
+    before do
+      create(:alarm_content, category: :contact, body: '連絡してほしいニャ')
+      create(:alarm_content, category: :text, body: '起きてるニャ？')
+    end
+
+    it '対象のグループへ働きかけを予約する' do
+      expect { described_class.call_notice }
+        .to have_enqueued_job(LineReminderJob)
+        .with(line_group.line_group_id, ['連絡してほしいニャ', '起きてるニャ？'])
+    end
+
+    it '次に働きかける日を先送りする' do
       described_class.call_notice
 
-      expect(described_class).to have_received(:scheduler).with(:remind_groups, :sampler, :call)
+      expect(line_group.reload.remind_at).to be > Date.current
+    end
+
+    it '働きかける日がまだ先のグループは対象にしない' do
+      line_group.update!(remind_at: Date.current.tomorrow)
+
+      expect { described_class.call_notice }.not_to have_enqueued_job(LineReminderJob)
     end
   end
 
   describe '.wait_notice' do
-    it 'schedules wait reminders for groups due for a wait' do
-      allow(LineGroup).to receive(:remind_wait).and_return(:remind_groups)
-      allow(described_class).to receive(:initialize_content_sampler).and_return(:sampler)
-      allow(described_class).to receive(:scheduler)
+    let!(:line_group) { create(:line_group, status: :wait, remind_at: Date.current) }
+
+    before do
+      create(:content, category: :contact, body: '元気ニャ？')
+      create(:content, category: :free, body: '今日はいい天気ニャ')
+      create(:content, category: :text, body: 'また話そうニャ')
+    end
+
+    it 'カテゴリの順に文面を並べて働きかけを予約する' do
+      expect { described_class.wait_notice }
+        .to have_enqueued_job(LineReminderJob)
+        .with(line_group.line_group_id, ['元気ニャ？', '今日はいい天気ニャ', 'また話そうニャ'])
+    end
+
+    it '働きかけたグループを call 状態にする' do
+      described_class.wait_notice
+
+      expect(line_group.reload.status).to eq('call')
+    end
+  end
+
+  describe '文面が足りないとき' do
+    let!(:line_group) { create(:line_group, status: :wait, remind_at: Date.current) }
+
+    before do
+      create(:content, category: :contact, body: '元気ニャ？')
+      allow(LineMailer).to receive(:error_email).and_return(double(deliver_later: true))
+      allow(Rails.logger).to receive(:error)
+    end
+
+    it '運用者へ通知する' do
+      described_class.wait_notice
+
+      expect(LineMailer).to have_received(:error_email)
+        .with(line_group.line_group_id, /働きかけの文面が登録されていません\(free\)/)
+    end
+
+    it '働きかけは予約しない' do
+      expect { described_class.wait_notice }.not_to have_enqueued_job(LineReminderJob)
+    end
+
+    it '失敗したことを記録する' do
+      allow(PrometheusMetrics).to receive(:track_message_send)
 
       described_class.wait_notice
 
-      expect(described_class).to have_received(:scheduler).with(:remind_groups, :sampler, :wait)
-    end
-  end
-
-  describe '.initialize_alarm_sampler' do
-    it 'preloads and returns an alarm content sampler' do
-      sampler = instance_double(Line::AlarmContentSampler)
-      allow(Line::AlarmContentSampler).to receive(:new).and_return(sampler)
-      allow(sampler).to receive(:preload_all)
-
-      expect(described_class.initialize_alarm_sampler).to eq(sampler)
-      expect(sampler).to have_received(:preload_all)
-    end
-  end
-
-  describe '.initialize_content_sampler' do
-    it 'preloads and returns a content sampler' do
-      sampler = instance_double(Line::ContentSampler)
-      allow(Line::ContentSampler).to receive(:new).and_return(sampler)
-      allow(sampler).to receive(:preload_all)
-
-      expect(described_class.initialize_content_sampler).to eq(sampler)
-      expect(sampler).to have_received(:preload_all)
-    end
-  end
-
-  describe '.build_messages' do
-    it 'builds call messages for the :call notice type' do
-      sampler = instance_double(Line::AlarmContentSampler)
-      allow(sampler).to receive_messages(available?: true, sample: double(body: 'x'))
-
-      expect(described_class.build_messages(sampler, :call).size).to eq(2)
-    end
-
-    it 'raises ArgumentError for an unknown notice type' do
-      expect { described_class.build_messages(double, :unknown) }
-        .to raise_error(ArgumentError, 'Unknown notice type: unknown')
+      expect(PrometheusMetrics).to have_received(:track_message_send).with('error')
     end
   end
 end

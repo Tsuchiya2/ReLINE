@@ -66,7 +66,7 @@
 - **レート制限** - `rack-attack` - ブルートフォース攻撃対策とリクエストスロットリング
 - **メッセージング** - `line-bot-api` - LINE Messaging API連携
 - **監視** - `prometheus-client` - メトリクス収集と監視
-- **ログ** - `lograge` + `request_store` - 相関IDつき構造化ログ
+- **ログ** - `lograge` - リクエストIDつき構造化ログ
 
 #### 開発・テスト
 
@@ -109,35 +109,29 @@
 
 ![LINE Botリアクションフロー](/readme-images/line-bot-reaction.webp)
 
-イベント処理システムは、単一のエンドポイントで複数のLINE Messaging APIイベントをエレガントに処理します：
+単一のエンドポイントで複数のLINE Messaging APIイベントを処理します。
+LINE SDK（`line-bot-api` v2）に触れる箇所は`LineMessaging`へ寄せ、コントローラーは受け口に徹しています。
 
-- **サービスオブジェクト** - 各イベントタイプ専用のサービスクラス
-- **ストラテジーパターン** - 動的なイベントハンドラー選択
-- **シンコントローラー** - 責務を委譲した最小限のコントローラーロジック
-- **Rubocop準拠** - 可読性を損なうことなく厳格なスタイルガイドラインに準拠
-
-主要なサービスは以下のとおりです。
-
-| クラス | 責務 |
+| クラス / モジュール | 責務 |
 |--------|------|
-| `Line::EventProcessor` | Webhookイベントのオーケストレーション |
-| `Line::GroupService` | グループの参加・退出などライフサイクル管理 |
-| `Line::CommandHandler` | 特殊コマンドの処理 |
-| `Line::OneOnOneHandler` | 1対1トークの処理 |
-| `Line::ClientAdapter` / `Line::ClientProvider` | LINE SDKの抽象化とクライアント供給 |
-| `Webhooks::SignatureValidator` | 署名検証（タイミング攻撃対策付き） |
-| `Resilience::RetryHandler` | 指数バックオフによるリトライ |
-| `ErrorHandling::MessageSanitizer` | ログ・通知からの資格情報の除去 |
+| `CatLineBot` | Webhookイベントの振り分け |
+| `LineMessaging` | LINE Messaging APIとのやり取り（送信・退出・人数取得） |
+| `MessageEvent` | メッセージイベントの処理（合言葉への応答・1対1トーク） |
+| `LineGroup` | グループの記録と、次に働きかける日の管理 |
+| `Scheduler` | 定期的な働きかけの組み立て |
+| `LineReminderJob` / `LineWelcomeMessageJob` | LINEへの送信（通信エラー時は指数バックオフで再試行） |
+| `ErrorSanitizer` | ログ・通知からの資格情報の除去 |
+
+Webhookの署名検証とイベントのパースは、SDKの`Line::Bot::V2::WebhookParser`がまとめて担当します。
+グループのメンバー数は`Rails.cache`に短時間だけ保持し、イベントごとの問い合わせを抑えています。
 
 ### 認証アーキテクチャ
 
-Sorceryからの移行後、認証はRails 8標準の`has_secure_password`をベースにしたプロバイダー抽象で構成されています。
+Sorceryからの移行後、認証はRails 8標準の`has_secure_password`で構成されています。
 
-- `Authentication::Provider` - 認証プロバイダーの共通インターフェース
-- `Authentication::PasswordProvider` - パスワード認証の実装
-- `AuthenticationService` / `AuthResult` - 認証処理とその結果オブジェクト
-- `SessionManager` - セッションの生成・失効管理
-- `BruteForceProtection` - 失敗回数によるアカウントロック
+- `Authentication` - ログイン・ログアウトとログイン状態の保持（コントローラーconcern）
+- `BruteForceProtection` - 失敗回数によるアカウントロック（モデルconcern）
+- `Operator` - `normalizes`によるメールアドレスの正規化と、パスワードの複雑性検証
 
 ### PWA
 
@@ -163,7 +157,7 @@ Webフロントエンドはインストール可能なPWAとして動作しま�
 
 ## 📊 テスト
 
-- **RSpec** - モデル / サービス / リクエスト / システムスペックを網羅
+- **RSpec** - モデル / コントローラー / リクエスト / システムスペックを網羅
 - **SimpleCov** - `COVERAGE=true`または`CI=true`での実行時のみ計測され、行・ブランチともに100%を下回るとテストが失敗（通常の`bundle exec rspec`では計測されません）
 - **Selenium** - ヘッドレスChromeによるシステムテスト
 - **Jest** - Service Workerモジュール（`app/javascript/pwa/**`）のユニットテスト
@@ -336,12 +330,9 @@ docker compose exec web bin/rails wait_notice:wait_reminds
 
 ### プロジェクトドキュメント
 
-- [ドキュメント一覧](docs/README.md) - `docs/`配下の案内
 - [TESTING.md](TESTING.md) - テストの実行方法とカバレッジ方針
-- [CHANGELOG.md](CHANGELOG.md) - 変更履歴
-- [docs/MIGRATION_GUIDE.md](docs/MIGRATION_GUIDE.md) - LINE Bot SDK v2への移行手順
-- [docs/observability/authentication-monitoring.md](docs/observability/authentication-monitoring.md) - 認証まわりの監視設計
-- [docs/deployment/ROLLBACK.md](docs/deployment/ROLLBACK.md) - 認証移行のロールバック手順
+- [spec/system/PWA_TESTING_README.md](spec/system/PWA_TESTING_README.md) - PWAシステムテストのガイド
+- [spec/javascript/README.md](spec/javascript/README.md) - Service WorkerのJestテストガイド
 
 ### 外部ドキュメント
 

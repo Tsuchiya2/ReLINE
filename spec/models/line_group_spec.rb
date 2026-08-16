@@ -172,4 +172,32 @@ RSpec.describe LineGroup, type: :model do
       end
     end
   end
+
+  describe 'クラスメソッド' do
+    context 'find_or_create_from_line!' do
+      it 'まだ記録が無ければ作成する。' do
+        expect { described_class.find_or_create_from_line!('GROUP123', 5) }
+          .to change(described_class, :count).by(1)
+      end
+
+      it '作成した記録は翌日を働きかけ日にする。' do
+        created = described_class.find_or_create_from_line!('GROUP123', 5)
+
+        expect(created).to have_attributes(remind_at: Date.current.tomorrow, status: 'wait', member_count: 5)
+      end
+
+      it '既に記録があれば作り直さない。' do
+        existing = create(:line_group, line_group_id: 'GROUP123')
+
+        expect { described_class.find_or_create_from_line!('GROUP123', 5) }
+          .not_to change(described_class, :count)
+        expect(described_class.find_or_create_from_line!('GROUP123', 5)).to eq(existing)
+      end
+
+      it 'Bot と 1 人だけの状態では作成しない。' do
+        expect { described_class.find_or_create_from_line!('GROUP123', 1) }
+          .not_to change(described_class, :count)
+      end
+    end
+  end
 end

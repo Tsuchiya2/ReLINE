@@ -24,7 +24,7 @@ ReLINEのテストは、Ruby側の **RSpec** と、Service Workerモジュール
 docker compose exec web bundle exec rspec
 
 # ディレクトリ単位
-docker compose exec web bundle exec rspec spec/services
+docker compose exec web bundle exec rspec spec/models
 docker compose exec web bundle exec rspec spec/requests
 docker compose exec web bundle exec rspec spec/system
 

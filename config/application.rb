@@ -30,7 +30,9 @@ module CatSalvagesTheRelationship
     # in config/environments, which are processed later.
     #
     # config.time_zone = "Central Time (US & Canada)"
-    # config.eager_load_paths << Rails.root.join("extras")
+
+    # lib 配下のクラスも app 配下と同じように読み込みます
+    config.autoload_lib(ignore: %w[assets tasks])
 
     config.i18n.default_locale = :ja
     config.i18n.load_path += Dir[Rails.root.join('config/locales/**/*.{rb,yml}').to_s]
@@ -47,11 +49,7 @@ module CatSalvagesTheRelationship
       g.skip_routes true
     end
 
-    # Request correlation middleware for observability
-    # Only add if RequestCorrelation middleware is defined (TASK-019)
-    config.middleware.insert_before Rails::Rack::Logger, RequestCorrelation if defined?(RequestCorrelation)
-
-    # Enable Rack::Attack for rate limiting and brute force protection
+    # ログイン試行などへのレート制限
     config.middleware.use Rack::Attack
   end
 end
