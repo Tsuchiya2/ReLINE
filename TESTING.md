@@ -4,7 +4,7 @@ ReLINEのテストは、Ruby側の **RSpec** と、Service Workerモジュール
 
 | 対象 | フレームワーク | 設定ファイル | 実行コマンド |
 |------|----------------|--------------|--------------|
-| Rails（モデル / サービス / リクエスト / システム） | RSpec | `.rspec` / `spec/rails_helper.rb` | `bundle exec rspec` |
+| Rails（モデル / コントローラー / リクエスト / システム） | RSpec | `.rspec` / `spec/rails_helper.rb` | `bundle exec rspec` |
 | Service Workerモジュール（キャッシュ戦略 / `strategy_router` / `lifecycle_manager` / `config_loader`） | Jest | `jest.config.js` / `babel.config.json` | `npm test` |
 
 `app/javascript/pwa/`配下でも`install_prompt_manager.js`と`service_worker_registration.js`は
@@ -43,19 +43,17 @@ docker compose exec web bundle exec rspec --only-failures
 ```text
 spec/
 ├── channels/     # ActionCable
-├── controllers/  # コントローラスペック
+├── controllers/  # コントローラスペック・concern
 ├── factories/    # FactoryBot定義
 ├── helpers/      # ヘルパー
 ├── javascript/   # Jest（RSpecの対象外）
 ├── jobs/         # ActiveJob
+├── lib/          # lib/配下のモジュール
 ├── mailers/      # ActionMailer
-├── middleware/   # Rackミドルウェア
 ├── models/       # モデル・concern
 ├── requests/     # リクエストスペック（API / manifest / metrics）
-├── services/     # サービスオブジェクト
 ├── support/      # 共通ヘルパー・Capybara設定
-├── system/       # Selenium + CapybaraによるE2E
-└── validators/   # カスタムバリデータ
+└── system/       # Selenium + CapybaraによるE2E
 ```
 
 `spec/support/**/*.rb`は`spec/rails_helper.rb`から自動で読み込まれます。
@@ -158,6 +156,8 @@ GitHub Actionsで以下のワークフローが動作します。
 | Auto Release | `.github/workflows/release.yml` | `main`へのpush | パッチバージョンを進めてGitHub Releaseを自動作成 |
 
 CIでは`CI=true`と`COVERAGE=true`が設定されるため、SimpleCovの100%閾値がそのまま適用されます。
+
+Jest（`npm test`）はCIに組み込まれていません。`app/javascript/pwa/`配下を変更した際はローカルで実行してください。
 
 ---
 
