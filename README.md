@@ -157,7 +157,7 @@ Webフロントエンドはインストール可能なPWAとして動作しま�
 
 ## 📊 テスト
 
-- **RSpec** - モデル / コントローラー / リクエスト / システムスペックを網羅
+- **RSpec** - モデル / コントローラー / ジョブ / リクエスト / システムスペックを網羅
 - **SimpleCov** - `COVERAGE=true`または`CI=true`での実行時のみ計測され、行・ブランチともに100%を下回るとテストが失敗（通常の`bundle exec rspec`では計測されません）
 - **Selenium** - ヘッドレスChromeによるシステムテスト
 - **Jest** - Service Workerモジュール（`app/javascript/pwa/**`）のユニットテスト
@@ -206,10 +206,9 @@ docker compose run --rm -e EDITOR=vi web bin/rails credentials:edit
 
 ```yaml
 # LINE Messaging API
-channel_id: YOUR_CHANNEL_ID
-channel_secret: YOUR_CHANNEL_SECRET
-channel_token: YOUR_CHANNEL_TOKEN
-callback_route: your_webhook_path   # POST /operator/<callback_route> になります
+channel_secret: YOUR_CHANNEL_SECRET  # Webhookの署名検証に使用
+channel_token: YOUR_CHANNEL_TOKEN    # チャネルアクセストークン
+callback_route: your_webhook_path    # POST /operator/<callback_route> になります
 
 # db:seed で使用する初期データ
 guest:
@@ -306,23 +305,22 @@ docker compose exec web bin/rails wait_notice:wait_reminds
 
 ## 🎓 技術的ハイライト
 
-### 課題：イベント駆動アーキテクチャ
+### 課題：単一エンドポイントで多様なイベントを捌く
 
-最も重要な課題の1つは、LINE Messaging API向けのクリーンなイベント駆動アーキテクチャの実装でした。単一のWebhookエンドポイントが複数のイベントタイプ（メッセージ、フォロー、参加、退出など）を受信し、それぞれに異なる処理ロジックが必要でした。
+LINE Messaging APIのWebhookは、メッセージ・参加・退出・フォローなど複数の種類のイベントを単一のエンドポイントへ送ります。それぞれ処理が異なるうえ、LINEへの応答は速やかに返す必要があります。
 
 **解決策：**
 
-以下を実現するサービス指向アーキテクチャを実装しました：
-- イベント処理ロジックを専用のサービスオブジェクトに分離
-- サービスに委譲するシンコントローラーを維持
-- 拡張性のためのポリモーフィックなイベントプロセッサを使用
-- SOLIDの原則とRubocop標準に準拠
+- **振り分けと送信の分離** - `CatLineBot`がイベントの種類を判定し、LINEへの送信は`LineReminderJob` / `LineWelcomeMessageJob`へ委譲。Webhookの応答が外部APIの応答時間に引きずられないようにしています
+- **SDKに触れる箇所の集約** - `Line::Bot::V2::*`を直接扱うのは`LineMessaging`だけに限定し、SDKの変更の影響範囲を閉じ込めています
+- **失敗への備え** - 通信エラーはActiveJobの`retry_on`で指数バックオフ再送。処理できなかったイベントは、資格情報を伏せたうえで運用者へメール通知します
+- **Railsの語彙で表現する** - モデル・concern・ジョブといったRails標準の置き場に収め、独自のレイヤーを増やさない構成にしています
 
-このアーキテクチャは以下を通じて進化しました：
+このアーキテクチャは以下を通じて形になりました：
 - 経験豊富なエンジニアからのフィードバック
 - 「パーフェクトRuby on Rails」のベストプラクティスの学習
-- Fat ModelとFat Controllerを避けるための反復的なリファクタリング
-- 厳格なRubocop準拠
+- Fat ControllerとFat Modelの両方を避けるための反復的なリファクタリング
+- 厳格なRubocop準拠と、行・ブランチともに100%のテストカバレッジ
 
 ---
 
