@@ -5,6 +5,12 @@ on:
     branches:
       - main
 
+# 連続してマージされたときにワークフローが並走すると、
+# 同じコミットへ別々のタグが付いてしまうため直列化する
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -17,79 +23,82 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get latest tag
-        id: get_tag
-        run: |
-          # Get the latest tag, default to v0.0.0 if none exists
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
-          echo "Latest tag: $LATEST_TAG"
-
       - name: Calculate next version
         id: next_version
         run: |
-          LATEST_TAG=${{ steps.get_tag.outputs.latest_tag }}
+          # git describe はコミット距離が最も近いタグを返すため、
+          # 1つのコミットに複数のタグが付いていると最大バージョンとは限らない。
+          # バージョン番号で並べ替えて最大のものを起点にする。
+          LATEST_TAG=$(git tag --list 'v*' --sort=-v:refname | head -n 1)
+          LATEST_TAG=${LATEST_TAG:-v0.0.0}
 
-          # Remove 'v' prefix and split version
           VERSION=${LATEST_TAG#v}
-          MAJOR=$(echo $VERSION | cut -d. -f1)
-          MINOR=$(echo $VERSION | cut -d. -f2)
-          PATCH=$(echo $VERSION | cut -d. -f3)
+          MAJOR=$(echo "$VERSION" | cut -d. -f1)
+          MINOR=$(echo "$VERSION" | cut -d. -f2)
+          PATCH=$(echo "$VERSION" | cut -d. -f3)
 
-          # Increment patch version
+          # 既に使われている番号は飛ばす
           NEW_PATCH=$((PATCH + 1))
+          while git rev-parse -q --verify "refs/tags/v${MAJOR}.${MINOR}.${NEW_PATCH}" >/dev/null; do
+            NEW_PATCH=$((NEW_PATCH + 1))
+          done
           NEW_VERSION="v${MAJOR}.${MINOR}.${NEW_PATCH}"
 
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "New version: $NEW_VERSION"
+          echo "latest_tag=$LATEST_TAG" >> "$GITHUB_OUTPUT"
+          echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Latest tag: $LATEST_TAG / New version: $NEW_VERSION"
 
       - name: Get merged PR info
         id: pr_info
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
-          # Get the PR number from the merge commit
-          PR_NUMBER=$(gh pr list --state merged --base main --limit 1 --json number --jq '.[0].number' 2>/dev/null || echo "")
+          # マージコミットのメッセージから PR 番号を取り出す。
+          # gh pr list では、連続してマージされたときに別の PR を拾うことがある。
+          PR_NUMBER=$(git log -1 --pretty=%s "$HEAD_SHA" | grep -oE '#[0-9]+' | head -n 1 | tr -d '#' || true)
+          PR_TITLE=""
 
           if [ -n "$PR_NUMBER" ]; then
-            PR_TITLE=$(gh pr view $PR_NUMBER --json title --jq '.title')
-            PR_BODY=$(gh pr view $PR_NUMBER --json body --jq '.body')
-            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-            echo "pr_title=$PR_TITLE" >> $GITHUB_OUTPUT
-            echo "Found PR #$PR_NUMBER: $PR_TITLE"
-          else
-            echo "pr_number=" >> $GITHUB_OUTPUT
-            echo "pr_title=" >> $GITHUB_OUTPUT
-            echo "No merged PR found"
+            PR_TITLE=$(gh pr view "$PR_NUMBER" --json title --jq '.title' 2>/dev/null || true)
           fi
+
+          # PRが見つからない、または取得に失敗した場合はコミットメッセージを使う
+          if [ -z "$PR_TITLE" ]; then
+            PR_NUMBER=""
+          fi
+
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "pr_title=$PR_TITLE" >> "$GITHUB_OUTPUT"
+          echo "PR: ${PR_NUMBER:-(なし)} ${PR_TITLE}"
 
       - name: Create Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ steps.next_version.outputs.new_version }}
+          LATEST_TAG: ${{ steps.next_version.outputs.latest_tag }}
+          PR_NUMBER: ${{ steps.pr_info.outputs.pr_number }}
+          PR_TITLE: ${{ steps.pr_info.outputs.pr_title }}
+          COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.sha }}
         run: |
-          NEW_VERSION=${{ steps.next_version.outputs.new_version }}
-          PR_NUMBER=${{ steps.pr_info.outputs.pr_number }}
-          PR_TITLE="${{ steps.pr_info.outputs.pr_title }}"
-
-          # Build release notes
           if [ -n "$PR_NUMBER" ]; then
-            RELEASE_NOTES="## What's Changed
-
-          * ${PR_TITLE} (#${PR_NUMBER})
-
-          **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.get_tag.outputs.latest_tag }}...${NEW_VERSION}"
+            CHANGE_LINE="* ${PR_TITLE} (#${PR_NUMBER})"
           else
-            RELEASE_NOTES="## What's Changed
-
-          * ${{ github.event.head_commit.message }}
-
-          **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.get_tag.outputs.latest_tag }}...${NEW_VERSION}"
+            CHANGE_LINE="* ${COMMIT_SUBJECT}"
           fi
 
-          # Create tag and release
+          RELEASE_NOTES="## What's Changed
+
+          ${CHANGE_LINE}
+
+          **Full Changelog**: https://github.com/${REPOSITORY}/compare/${LATEST_TAG}...${NEW_VERSION}"
+
+          # push されたコミットを対象にする（--target main では実行時の先端に付いてしまう）
           gh release create "$NEW_VERSION" \
             --title "$NEW_VERSION" \
             --notes "$RELEASE_NOTES" \
-            --target main
+            --target "$HEAD_SHA"
 
           echo "✅ Released $NEW_VERSION"
