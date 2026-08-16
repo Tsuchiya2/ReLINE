@@ -74,8 +74,3 @@ AUTH_LOCKED_ACCOUNTS_TOTAL = prometheus.counter(
   docstring: 'Total accounts locked due to brute force protection',
   labels: [:provider]
 )
-
-AUTH_ACTIVE_SESSIONS = prometheus.gauge(
-  :auth_active_sessions,
-  docstring: 'Number of currently active user sessions'
-)
