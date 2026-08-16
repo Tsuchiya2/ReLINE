@@ -5,8 +5,9 @@
 This guide explains the migration from the legacy `CatLineBot` implementation to the new service-oriented architecture using LINE Bot SDK v2.x.
 
 **Migration Date**: 2025-11-17
-**Rails Version**: 8.1.1
-**Ruby Version**: 3.4.6
+**Rails Version at migration**: 8.1.1（現在: 8.1.3）
+**Ruby Version at migration**: 3.4.6（現在: 4.0.5）
+**Last Reviewed**: 2026-08-16
 
 ---
 
@@ -41,7 +42,7 @@ LINE Webhook → WebhooksController → EventProcessor
 ## Breaking Changes
 
 **None** - This migration is 100% backward compatible:
-- Same webhook endpoint: `POST /operator/callback`
+- Same webhook endpoint: `POST /operator/<callback_route>`（パスは`Rails.application.credentials.callback_route`で定義）
 - Same business logic (join, leave, commands)
 - Same database schema
 - Same scheduler behavior
@@ -53,18 +54,34 @@ LINE Webhook → WebhooksController → EventProcessor
 ### 1. Health Check Endpoints
 
 ```bash
-# Shallow health check (fast)
+# Shallow health check (fast) - liveness
 GET /health
-# Response: { "status": "ok" }
+# Response: {
+#   "status": "ok",
+#   "timestamp": "2026-08-16T10:00:00+09:00",
+#   "version": "CatSalvagesTheRelationship"
+# }
 
 # Deep health check (verifies dependencies)
 GET /health/deep
-# Response: {
+# Response (200 / 503):
+# {
 #   "status": "ok",
-#   "database": { "status": "ok", "latency_ms": 2.34 },
-#   "line_credentials": { "status": "ok" }
+#   "timestamp": "2026-08-16T10:00:00+09:00",
+#   "checks": {
+#     "database":   { "status": "ok", "response_time_ms": 2.34 },
+#     "disk_space": { "status": "ok", "usage_percent": 42 }
+#   }
 # }
+# いずれかのチェックが "ok" 以外なら status は "degraded" となり 503 を返します。
+
+# Readiness check (database connectivity only)
+GET /health/ready
+# Response (200): { "status": "ready", "timestamp": "..." }
+# Response (503): { "status": "not_ready", "reason": "database_unavailable" }
 ```
+
+> `GET /health/ready` は Rails 8 認証移行（2025-11-26）で追加されました。
 
 ### 2. Metrics Endpoint
 
@@ -77,6 +94,9 @@ GET /metrics
 # line_api_calls_total{method="push_message",status="success"} 567
 # line_groups_total 42
 ```
+
+本番環境では`MONITOR_USERNAME` / `MONITOR_PASSWORD`によるBasic認証が必要です。
+どちらか一方でも未設定の場合、`/metrics`は403を返します。
 
 ### 3. Structured Logging
 
@@ -129,7 +149,7 @@ app/models/concerns/message_event.rb  (deleted)
 
 - `app/controllers/operator/webhooks_controller.rb` - Uses EventProcessor
 - `app/models/scheduler.rb` - Uses ClientProvider
-- `config/routes.rb` - Added /health and /metrics
+- `config/routes.rb` - Added /health, /health/deep and /metrics（/health/ready は後続の認証移行で追加）
 - `Gemfile` - Updated dependencies
 
 ---
@@ -162,9 +182,12 @@ No changes required - same structure:
 channel_id: YOUR_CHANNEL_ID
 channel_secret: YOUR_CHANNEL_SECRET
 channel_token: YOUR_CHANNEL_TOKEN
+callback_route: your_webhook_path
 operator:
   email: your-email@example.com
 ```
+
+credentialsに必要な全キーは[README.md](../README.md)を参照してください。
 
 ---
 
@@ -177,8 +200,8 @@ operator:
 bundle exec rspec
 bundle exec rubocop
 
-# 2. Backup database
-rake db:dump  # or your backup method
+# 2. Backup database（mysqldump などお使いのバックアップ手段で）
+mysqldump -u root -p reline_production > backup_$(date +%Y%m%d_%H%M%S).sql
 
 # 3. Install new dependencies
 bundle install
@@ -201,7 +224,7 @@ heroku restart
 sudo systemctl reload your-app
 
 # Docker:
-docker-compose up -d --no-deps --build web
+docker compose up -d --no-deps --build web
 ```
 
 ### 3. Post-Deployment Verification
@@ -287,10 +310,8 @@ COVERAGE=true bundle exec rspec
 
 ### Test Coverage Goals
 
-- Utilities: ≥95%
-- Services: ≥90%
-- Controllers: ≥90%
-- Overall: ≥90%
+`spec/rails_helper.rb`のSimpleCov設定により、行・ブランチともに **100%** が必須です
+（`COVERAGE=true`または`CI=true`のときに計測・判定されます）。詳細は[TESTING.md](../TESTING.md)を参照してください。
 
 ---
 
@@ -298,15 +319,20 @@ COVERAGE=true bundle exec rspec
 
 ### Issue: Health check returns 503
 
-**Cause**: Database or LINE credentials unavailable
+**Cause**: `GET /health/deep`はデータベース接続とディスク空き容量をチェックします。
+どちらかが`ok`でない場合に503（`"status": "degraded"`）を返します。
+`GET /health/ready`はデータベース接続のみをチェックします。
 
 **Solution**:
 ```bash
-# Check database
+# レスポンスの checks を見て、どちらが失敗しているか確認
+curl -s https://your-app.com/health/deep | jq
+
+# データベース
 rails db:migrate:status
 
-# Verify credentials
-rails credentials:edit
+# ディスク空き容量（使用率90%以上で warning）
+df -h /
 ```
 
 ### Issue: Metrics endpoint returns empty
@@ -331,9 +357,9 @@ ls config/initializers/lograge.rb
 
 ## Support
 
-- GitHub Issues: https://github.com/your-repo/issues
-- Documentation: `/docs/designs/line-sdk-modernization.md`
-- Contact: your-email@example.com
+- GitHub Issues: https://github.com/Tsuchiya2/ReLINE/issues
+- 設計ドキュメント: [docs/designs/line-sdk-modernization.md](designs/line-sdk-modernization.md)
+- ドキュメント索引: [docs/README.md](README.md)
 
 ---
 

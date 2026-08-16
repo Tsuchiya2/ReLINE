@@ -1,8 +1,15 @@
 # Rollback Procedure for Rails 8 Authentication Migration
 
+**Last Updated**: 2026-08-16
+
 ## Overview
 
 This document describes the rollback procedure for the Rails 8 `has_secure_password` authentication migration from Sorcery gem.
+
+> **現状**: 3フェーズすべてのマイグレーションは適用済みで、`operators`テーブルから
+> `crypted_password` / `salt` は削除されています（`db/schema.rb`）。
+> したがって、現時点で適用されるのは後述の **Scenario B（データベースのリストアが必要）** です。
+> 本ドキュメントは移行時の手順記録として残しています。
 
 ## Pre-Deployment Checklist
 
@@ -17,11 +24,11 @@ Before deploying, ensure:
 
 The migration consists of 3 phases:
 
-| Phase | Migration File | Can Rollback? | Timing |
-|-------|---------------|---------------|--------|
-| 1 | `20251125141044_add_password_digest_to_operators.rb` | ✅ Yes | Deploy Day |
-| 2 | `20251125142049_migrate_sorcery_passwords.rb` | ✅ Yes | Deploy Day |
-| 3 | `20251125142050_remove_sorcery_columns_from_operators.rb` | ⚠️ No* | 30+ Days Later |
+| Phase | Migration File | Can Rollback? | Timing | 状態 |
+|-------|---------------|---------------|--------|------|
+| 1 | `20251125141044_add_password_digest_to_operators.rb` | ✅ Yes | Deploy Day | 適用済み |
+| 2 | `20251125142049_migrate_sorcery_passwords.rb` | ✅ Yes | Deploy Day | 適用済み |
+| 3 | `20251125142050_remove_sorcery_columns_from_operators.rb` | ⚠️ No* | 30+ Days Later | 適用済み |
 
 **Phase 3 removes `crypted_password` and `salt` columns permanently. Only run after confirming all operators can log in with the new system.*
 
@@ -217,4 +224,5 @@ After any rollback:
 
 | Date | Version | Author | Changes |
 |------|---------|--------|---------|
-| 2025-11-28 | 1.0 | Claude | Initial rollback procedure |
+| 2025-11-28 | 1.0 | Backend Team | Initial rollback procedure |
+| 2026-08-16 | 1.1 | Backend Team | 全フェーズ適用済みであることを明記し、実装との差分を修正 |

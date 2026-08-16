@@ -744,8 +744,8 @@ end
 - 🌐 Multi-language support (EN/JA)
 
 For detailed authentication documentation, see:
-- [Authentication Monitoring Guide](docs/observability/authentication-monitoring.md)
-- [Migration from Sorcery to Rails 8](docs/designs/rails8-authentication-migration.md)
+- [Authentication Monitoring Guide](../observability/authentication-monitoring.md)
+- [Migration from Sorcery to Rails 8](../designs/rails8-authentication-migration.md)
 ```
 
 #### 2. Add Developer Usage Guide

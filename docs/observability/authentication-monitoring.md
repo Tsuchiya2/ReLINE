@@ -1,11 +1,12 @@
 # Authentication Monitoring and Observability
 
 **Document Status**: Production Ready
-**Last Updated**: 2025-11-26
+**Last Updated**: 2026-08-16
 **Owner**: Backend Team
 **Related Documents**:
 - [Rails 8 Authentication Migration Design](../designs/rails8-authentication-migration.md)
 - [Rails 8 Authentication Migration Tasks](../plans/rails8-authentication-migration-tasks.md)
+- [LINE Bot SDK Migration Guide](../MIGRATION_GUIDE.md)
 
 ---
 
@@ -556,11 +557,16 @@ sum(rate(auth_locked_accounts_total[5m])) * 60
 **File**: `config/environments/production.rb`
 
 ```ruby
-config.logger = ActiveSupport::Logger.new('log/production.log', 7, 100.megabytes)
+config.logger = ActiveSupport::Logger.new(
+  Rails.root.join('log', 'production.log'),
+  10,           # Keep 10 old log files
+  100.megabytes # Rotate when file reaches 100MB
+)
 ```
 
 - Rotate after 100 MB
-- Keep 7 log files
+- Keep 10 log files
+- `RAILS_LOG_TO_STDOUT`が設定されている場合は標準出力へ出力（ファイルローテーションは行われません）
 
 ### Centralized Logging (CloudWatch Logs)
 
@@ -640,59 +646,49 @@ fields @timestamp, user_email, ip
 
 ---
 
-## Performance Benchmarks
+## Performance Targets
 
-### Target Metrics
+| Metric | Target |
+|--------|--------|
+| Authentication success rate | ≥ 99% |
+| p50 latency | < 100ms |
+| p95 latency | < 500ms |
+| p99 latency | < 1000ms |
+| Account lockout rate | < 10/min |
+| Failed login rate | < 5% |
 
-| Metric | Target | Current | Status |
-|--------|--------|---------|--------|
-| Authentication success rate | ≥ 99% | 99.5% | ✅ |
-| p50 latency | < 100ms | 45ms | ✅ |
-| p95 latency | < 500ms | 234ms | ✅ |
-| p99 latency | < 1000ms | 456ms | ✅ |
-| Account lockout rate | < 10/min | 2/min | ✅ |
-| Failed login rate | < 5% | 0.5% | ✅ |
-
-### Benchmark Tests
-
-**File**: `spec/performance/authentication_benchmark_spec.rb`
-
-Run benchmarks:
-```bash
-bundle exec rspec spec/performance/authentication_benchmark_spec.rb
-```
-
-**Expected Output**:
-```
-Authentication Performance Benchmarks
-  successful login
-    p50: 45ms
-    p95: 234ms
-    p99: 456ms
-  failed login
-    p50: 40ms
-    p95: 210ms
-    p99: 430ms
-```
+実測値は上記のPrometheusクエリ（`auth_duration_seconds` / `auth_attempts_total`）で取得してください。
+自動化されたベンチマークスペックはリポジトリに存在しません。
 
 ---
 
 ## Environment Variables
 
-### Required Configuration
+認証・監視に関係する環境変数は以下のとおりです（設定の実体は
+`config/initializers/authentication.rb` と `app/controllers/metrics_controller.rb`）。
 
 ```bash
-# Observability
-STATSD_HOST=localhost                 # StatsD server host
-STATSD_PORT=8125                      # StatsD server port
-STATSD_SAMPLE_RATE=1.0                # Metrics sampling rate (1.0 = 100%)
+# 認証設定（config/initializers/authentication.rb）
+AUTH_LOGIN_RETRY_LIMIT=5      # ログイン失敗の許容回数
+AUTH_LOGIN_LOCK_DURATION=45   # アカウントロックの継続時間（分）
+AUTH_BCRYPT_COST=12           # bcrypt のコストファクタ（test は既定で 4）
+AUTH_PASSWORD_MIN_LENGTH=8    # パスワードの最小文字数
+AUTH_SESSION_TIMEOUT=30       # セッションのタイムアウト（分）
 
-# Prometheus
-METRICS_TOKEN=your-secret-token       # Token for /metrics endpoint authentication
+# Operator モデルのロック設定（app/models/operator.rb）
+OPERATOR_LOCK_RETRY_LIMIT=5
+OPERATOR_LOCK_DURATION=45
 
-# Logging
-LOG_LEVEL=info                        # Log level (debug, info, warn, error)
+# /metrics エンドポイントの Basic 認証（production のみ必須）
+MONITOR_USERNAME=metrics
+MONITOR_PASSWORD=your-secret-password
+
+# ログを標準出力に出す場合（config/environments/production.rb）
+RAILS_LOG_TO_STDOUT=true
 ```
+
+> ログレベルは`config.log_level = :info`として`config/environments/production.rb`に
+> ハードコードされており、環境変数では変更できません。
 
 ---
 
@@ -701,7 +697,8 @@ LOG_LEVEL=info                        # Log level (debug, info, warn, error)
 ### Internal Documentation
 - [Rails 8 Authentication Migration Design](../designs/rails8-authentication-migration.md)
 - [Rails 8 Authentication Migration Tasks](../plans/rails8-authentication-migration-tasks.md)
-- [LINE SDK Modernization Observability](line-sdk-observability.md)
+- [LINE Bot SDK Migration Guide](../MIGRATION_GUIDE.md)
+- [Rollback Procedure](../deployment/ROLLBACK.md)
 
 ### External Resources
 - [Lograge Documentation](https://github.com/roidrage/lograge)
@@ -711,6 +708,6 @@ LOG_LEVEL=info                        # Log level (debug, info, warn, error)
 
 ---
 
-**Document Version**: 1.0
-**Last Reviewed**: 2025-11-26
-**Next Review**: 2026-02-26
+**Document Version**: 1.1
+**Last Reviewed**: 2026-08-16
+**Next Review**: 2026-11-16
