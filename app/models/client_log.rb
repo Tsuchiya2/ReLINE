@@ -1,19 +1,3 @@
-# frozen_string_literal: true
-
-# ClientLog - Stores client-side logs from browser/service worker
-#
-# @!attribute [rw] level
-#   @return [String] Log level: "error", "warn", "info", "debug"
-# @!attribute [rw] message
-#   @return [String] Log message
-# @!attribute [rw] context
-#   @return [Hash] Structured log context data
-# @!attribute [rw] user_agent
-#   @return [String] Browser user agent string
-# @!attribute [rw] url
-#   @return [String] URL where log was generated
-# @!attribute [rw] trace_id
-#   @return [String] Distributed tracing ID for correlation
 class ClientLog < ApplicationRecord
   VALID_LEVELS = %w[error warn info debug].freeze
 

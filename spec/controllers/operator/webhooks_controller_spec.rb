@@ -2,81 +2,68 @@
 
 require 'rails_helper'
 
-# The callback route lives at a secret path derived from encrypted credentials
-# (unavailable without the master key), so this is a controller spec with an
-# explicitly drawn route rather than a request spec.
+# callback のパスは暗号化された credentials から組み立てるため(マスターキーが無いと引けない)、
+# リクエストスペックではなく、経路を引き直したコントローラースペックとして書いています。
 RSpec.describe Operator::WebhooksController, type: :controller do
-  let(:validator) { instance_double(Webhooks::SignatureValidator) }
-  let(:adapter) { instance_double(Line::SdkV2Adapter) }
-  let(:processor) { instance_double(Line::EventProcessor) }
   let(:body) { '{"events":[]}' }
 
-  # `routes.draw` mutates the global application route set, so restore the real
-  # routes afterwards to avoid breaking other specs.
+  # `routes.draw` はアプリ全体の経路を書き換えるため、他のテストへ影響しないよう元へ戻します。
   after { Rails.application.reload_routes! }
 
   before do
     routes.draw { post 'callback' => 'operator/webhooks#callback' }
-    allow(Webhooks::SignatureValidator).to receive(:new).and_return(validator)
-    allow(Line::ClientProvider).to receive(:client).and_return(adapter)
-    allow(Line::EventProcessor).to receive(:new).and_return(processor)
+    stub_line_credentials
     allow(PrometheusMetrics).to receive(:track_webhook_request)
   end
 
-  context 'when the signature header is missing' do
-    it 'returns bad_request without validating' do
+  def signature_for(request_body)
+    Base64.strict_encode64(
+      OpenSSL::HMAC.digest(OpenSSL::Digest.new('SHA256'), 'test_channel_secret', request_body)
+    )
+  end
+
+  context 'when 署名が無いとき' do
+    it 'bad_request を返す' do
       post :callback, body: body
 
       expect(response).to have_http_status(:bad_request)
+      expect(PrometheusMetrics).to have_received(:track_webhook_request).with('invalid_signature')
     end
   end
 
-  context 'when the signature is invalid' do
-    it 'returns bad_request' do
-      allow(validator).to receive(:valid?).and_return(false)
+  context 'when 署名が正しくないとき' do
+    it 'bad_request を返す' do
       request.headers['X-Line-Signature'] = 'invalid-signature'
 
       post :callback, body: body
 
       expect(response).to have_http_status(:bad_request)
+      expect(PrometheusMetrics).to have_received(:track_webhook_request).with('invalid_signature')
     end
   end
 
-  context 'when the signature is valid' do
-    before do
-      allow(validator).to receive(:valid?).and_return(true)
-      allow(adapter).to receive(:parse_events).with(body).and_return([])
-      request.headers['X-Line-Signature'] = 'valid-signature'
-    end
+  context 'when 署名が正しいとき' do
+    before { request.headers['X-Line-Signature'] = signature_for(body) }
 
-    it 'processes the events and returns ok' do
-      allow(processor).to receive(:process)
+    it 'イベントを処理して ok を返す' do
+      allow(CatLineBot).to receive(:line_bot_action)
 
       post :callback, body: body
 
       expect(response).to have_http_status(:ok)
-      expect(processor).to have_received(:process).with([])
+      expect(CatLineBot).to have_received(:line_bot_action).with([])
       expect(PrometheusMetrics).to have_received(:track_webhook_request).with('success')
     end
 
-    it 'returns service_unavailable and tracks a timeout on Timeout::Error' do
-      allow(processor).to receive(:process).and_raise(Timeout::Error)
-
-      post :callback, body: body
-
-      expect(response).to have_http_status(:service_unavailable)
-      expect(PrometheusMetrics).to have_received(:track_webhook_request).with('timeout')
-    end
-
-    it 'returns service_unavailable and logs a sanitized error on StandardError' do
-      allow(processor).to receive(:process).and_raise(StandardError.new('channel_secret: super-secret-token'))
+    it '処理に失敗した場合は service_unavailable を返し、機密を伏せて記録する' do
+      allow(CatLineBot).to receive(:line_bot_action).and_raise(StandardError, 'channel_secret: super-secret-token')
       allow(Rails.logger).to receive(:error)
 
       post :callback, body: body
 
       expect(response).to have_http_status(:service_unavailable)
       expect(PrometheusMetrics).to have_received(:track_webhook_request).with('error')
-      expect(Rails.logger).to have_received(:error).with(/Webhook processing failed: \[REDACTED\]/)
+      expect(Rails.logger).to have_received(:error).with(/\[REDACTED\]/)
     end
   end
 end

@@ -6,23 +6,22 @@ Rails.application.configure do
 
   config.lograge.custom_options = lambda do |event|
     {
-      # Request correlation
-      correlation_id: RequestStore.store[:correlation_id],
-      request_id: RequestStore.store[:request_id],
+      # リクエストの追跡
+      request_id: event.payload[:request_id],
 
-      # LINE webhook event fields
+      # LINE の Webhook イベント
       group_id: event.payload[:group_id],
       event_type: event.payload[:event_type],
 
-      # Authentication event fields
+      # 認証イベント
       user_id: event.payload[:user_id],
       user_email: event.payload[:user_email],
       result: event.payload[:result],
       reason: event.payload[:reason],
 
-      # System info
+      # 実行環境
       rails_version: Rails.version,
-      sdk_version: '2.0.0',
+      line_bot_api_version: Line::Bot::VERSION,
       timestamp: Time.current.iso8601
     }
   end
