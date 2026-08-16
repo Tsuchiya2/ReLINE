@@ -84,13 +84,6 @@ Layout/CommentIndentation:
 RSpec/ContextWording:
   Enabled: false
 
-# rescue の 'e' 変数を他のメソッドに渡す際、引数の文字数は3文字以上の必要がありますが、
-# 'e'を変えると、rescue内容を格納する変数は'e'を使用するようにと指摘されてしまうため、
-# 現状は限定的に該当のファイルのみ3文字以上の制約を解除しています。
-Naming/MethodParameterName:
-  Exclude:
-    - 'app/models/scheduler.rb'
-
 # プロジェクトの実態に合わせて緩和・無効化したCop
 Metrics/MethodLength:
   Max: 20
@@ -106,8 +99,6 @@ Naming/VariableNumber:
 
 Layout/LineLength:
   Max: 200
-  Exclude:
-    - 'config/initializers/sorcery.rb'
 
 RSpec/VerifiedDoubles:
   Enabled: false
@@ -139,10 +130,3 @@ RSpec/RepeatedExample:
 Metrics/ModuleLength:
   Exclude:
     - 'spec/support/pwa_helpers.rb'
-
-# Playwright設定クラスは環境別設定のため108行必要
-# FileSystemStorageクラスはアーティファクト管理のため103行必要
-Metrics/ClassLength:
-  Exclude:
-    - 'lib/testing/playwright_configuration.rb'
-    - 'lib/testing/file_system_storage.rb'
