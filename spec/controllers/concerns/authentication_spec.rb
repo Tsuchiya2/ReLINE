@@ -2,21 +2,16 @@
 
 require 'rails_helper'
 
-# Test controller to include the Authentication concern
+# concern を確かめるための入れ物です。
 class TestAuthenticationController < ApplicationController
   include Authentication
 
-  # Test actions
   def public_action
     render plain: 'public'
   end
 
   def protected_action
     render plain: 'protected'
-  end
-
-  def custom_not_authenticated_action
-    render plain: 'custom'
   end
 end
 
@@ -31,346 +26,251 @@ RSpec.describe Authentication, type: :controller do
     def protected_action
       render plain: "protected for #{current_operator.email}"
     end
-
-    def custom_not_authenticated_action
-      render plain: 'custom'
-    end
   end
 
   let(:operator) { create(:operator, password: 'Password123', password_confirmation: 'Password123') }
   let(:request_ip) { '192.168.1.1' }
-  let(:auth_result_success) { AuthResult.success(user: operator) }
-  let(:auth_result_failed) { AuthResult.failed(:invalid_password) }
-  let(:auth_result_locked) { AuthResult.failed(:account_locked, user: operator) }
 
   before do
     routes.draw do
       get 'public_action' => 'test_authentication#public_action'
       get 'protected_action' => 'test_authentication#protected_action'
-      get 'custom_not_authenticated_action' => 'test_authentication#custom_not_authenticated_action'
     end
 
     allow(controller.request).to receive(:remote_ip).and_return(request_ip)
   end
 
   describe '#authenticate_operator' do
-    before do
-      allow(AuthenticationService).to receive(:authenticate).and_return(auth_result_success)
-    end
-
-    context 'when authentication is successful' do
-      it 'returns the authenticated operator' do
-        result = controller.authenticate_operator('test@example.com', 'password123')
-        expect(result).to eq(operator)
+    context 'when 正しい資格情報のとき' do
+      it '運用者を返す' do
+        expect(controller.authenticate_operator(operator.email, 'Password123')).to eq(operator)
       end
 
-      it 'calls AuthenticationService with correct parameters' do
-        expect(AuthenticationService).to receive(:authenticate).with(
-          :password,
-          email: 'test@example.com',
-          password: 'password123',
-          ip_address: request_ip
-        )
-        controller.authenticate_operator('test@example.com', 'password123')
-      end
-    end
-
-    context 'when authentication fails' do
-      before do
-        allow(AuthenticationService).to receive(:authenticate).and_return(auth_result_failed)
+      it 'メールアドレスの表記ゆれを吸収する' do
+        expect(controller.authenticate_operator("  #{operator.email.upcase} ", 'Password123')).to eq(operator)
       end
 
-      it 'returns nil' do
-        result = controller.authenticate_operator('test@example.com', 'wrong_password')
-        expect(result).to be_nil
+      it '失敗の記録を消す' do
+        operator.update!(failed_logins_count: 3)
+
+        controller.authenticate_operator(operator.email, 'Password123')
+
+        expect(operator.reload.failed_logins_count).to eq(0)
+      end
+
+      it '成功したことを記録する' do
+        allow(PrometheusMetrics).to receive(:track_authentication)
+
+        controller.authenticate_operator(operator.email, 'Password123')
+
+        expect(PrometheusMetrics).to have_received(:track_authentication)
+          .with(:success, reason: nil, duration: kind_of(Float))
       end
     end
 
-    context 'when account is locked' do
-      before do
-        allow(AuthenticationService).to receive(:authenticate).and_return(auth_result_locked)
-        allow(operator).to receive(:mail_notice)
+    context 'when 運用者が見つからないとき' do
+      it 'nil を返す' do
+        expect(controller.authenticate_operator('unknown@example.com', 'Password123')).to be_nil
       end
 
-      it 'returns nil' do
-        result = controller.authenticate_operator('test@example.com', 'password123')
-        expect(result).to be_nil
-      end
+      it '理由を添えて記録する' do
+        allow(PrometheusMetrics).to receive(:track_authentication)
 
-      it 'sends notification email' do
-        expect(operator).to receive(:mail_notice).with(request_ip)
-        controller.authenticate_operator('test@example.com', 'password123')
+        controller.authenticate_operator('unknown@example.com', 'Password123')
+
+        expect(PrometheusMetrics).to have_received(:track_authentication)
+          .with(:failed, reason: :user_not_found, duration: kind_of(Float))
       end
     end
 
-    context 'when account is locked and user is nil' do
-      let(:auth_result_locked_no_user) { AuthResult.failed(:account_locked) }
-
-      before do
-        allow(AuthenticationService).to receive(:authenticate)
-          .and_return(auth_result_locked_no_user)
+    context 'when パスワードが違うとき' do
+      it 'nil を返す' do
+        expect(controller.authenticate_operator(operator.email, 'WrongPassword1')).to be_nil
       end
 
-      it 'does not raise error' do
-        expect do
-          controller.authenticate_operator('test@example.com', 'password123')
-        end.not_to raise_error
+      it '失敗した回数を数える' do
+        expect { controller.authenticate_operator(operator.email, 'WrongPassword1') }
+          .to change { operator.reload.failed_logins_count }.by(1)
       end
+
+      it '理由を添えて記録する' do
+        allow(PrometheusMetrics).to receive(:track_authentication)
+
+        controller.authenticate_operator(operator.email, 'WrongPassword1')
+
+        expect(PrometheusMetrics).to have_received(:track_authentication)
+          .with(:failed, reason: :invalid_credentials, duration: kind_of(Float))
+      end
+    end
+
+    context 'when アカウントがロックされているとき' do
+      let(:operator) { create(:operator, :locked, password: 'Password123', password_confirmation: 'Password123') }
+
+      it 'nil を返す' do
+        expect(controller.authenticate_operator(operator.email, 'Password123')).to be_nil
+      end
+
+      it '本人へ通知する' do
+        expect { controller.authenticate_operator(operator.email, 'Password123') }
+          .to have_enqueued_mail(SessionMailer, :notice)
+      end
+
+      it '理由を添えて記録する' do
+        allow(PrometheusMetrics).to receive(:track_authentication)
+
+        controller.authenticate_operator(operator.email, 'Password123')
+
+        expect(PrometheusMetrics).to have_received(:track_authentication)
+          .with(:failed, reason: :account_locked, duration: kind_of(Float))
+      end
+    end
+
+    it '試行した内容をログへ残す' do
+      allow(Rails.logger).to receive(:info)
+
+      controller.authenticate_operator(operator.email, 'Password123')
+
+      expect(Rails.logger).to have_received(:info).with(
+        hash_including(event: 'authentication_attempt', result: :success, operator_id: operator.id, ip: request_ip)
+      )
     end
   end
 
   describe '#login' do
-    it 'sets operator_id in session' do
+    it 'セッションへ運用者を記録する' do
       controller.login(operator)
+
       expect(controller.session[:operator_id]).to eq(operator.id)
     end
 
-    it 'sets @current_operator instance variable' do
-      controller.login(operator)
-      expect(controller.current_operator).to eq(operator)
+    it 'ログイン中の運用者を返す' do
+      expect(controller.login(operator)).to eq(operator)
     end
 
-    it 'resets session to prevent session fixation' do
-      controller.session[:some_key] = 'some_value'
-      controller.login(operator)
-      expect(controller.session[:some_key]).to be_nil
-    end
+    it 'セッションを作り直して固定化攻撃を防ぐ' do
+      controller.session[:malicious_data] = 'hacker_value'
 
-    it 'returns the operator' do
-      result = controller.login(operator)
-      expect(result).to eq(operator)
+      controller.login(operator)
+
+      expect(controller.session[:malicious_data]).to be_nil
+      expect(controller.session[:operator_id]).to eq(operator.id)
     end
   end
 
   describe '#logout' do
-    before do
-      controller.login(operator)
-    end
+    before { controller.login(operator) }
 
-    it 'resets session' do
+    it 'セッションを破棄する' do
       controller.logout
+
       expect(controller.session[:operator_id]).to be_nil
     end
 
-    it 'clears @current_operator instance variable' do
-      controller.logout
+    it 'ログイン中の運用者を忘れる' do
+      expect(controller.logout).to be_nil
       expect(controller.current_operator).to be_nil
-    end
-
-    it 'returns nil' do
-      result = controller.logout
-      expect(result).to be_nil
     end
   end
 
   describe '#current_operator' do
-    context 'when operator is logged in' do
-      before do
-        controller.session[:operator_id] = operator.id
-        controller.send(:set_current_operator)
-      end
+    it 'ログインしていれば運用者を返す' do
+      controller.session[:operator_id] = operator.id
+      controller.send(:set_current_operator)
 
-      it 'returns the current operator' do
-        expect(controller.current_operator).to eq(operator)
-      end
+      expect(controller.current_operator).to eq(operator)
     end
 
-    context 'when operator is not logged in' do
-      it 'returns nil' do
-        expect(controller.current_operator).to be_nil
-      end
+    it 'ログインしていなければ nil を返す' do
+      expect(controller.current_operator).to be_nil
     end
   end
 
   describe '#operator_signed_in?' do
-    context 'when operator is logged in' do
-      before do
-        controller.session[:operator_id] = operator.id
-        controller.send(:set_current_operator)
-      end
+    it 'ログインしていれば true を返す' do
+      controller.session[:operator_id] = operator.id
+      controller.send(:set_current_operator)
 
-      it 'returns true' do
-        expect(controller.operator_signed_in?).to be true
-      end
+      expect(controller.operator_signed_in?).to be true
     end
 
-    context 'when operator is not logged in' do
-      it 'returns false' do
-        expect(controller.operator_signed_in?).to be false
-      end
+    it 'ログインしていなければ false を返す' do
+      expect(controller.operator_signed_in?).to be false
     end
   end
 
   describe '#require_authentication' do
-    context 'when operator is logged in' do
-      before do
-        controller.session[:operator_id] = operator.id
-        controller.send(:set_current_operator)
-      end
+    it 'ログインしていれば通す' do
+      controller.session[:operator_id] = operator.id
 
-      it 'allows access to protected action' do
-        get :protected_action
-        expect(response).to have_http_status(:success)
-        expect(response.body).to eq("protected for #{operator.email}")
-      end
-    end
-
-    context 'when operator is not logged in' do
-      it 'redirects to login page' do
-        get :protected_action
-        expect(response).to redirect_to(operator_cat_in_path)
-      end
-
-      it 'sets alert message' do
-        get :protected_action
-        expect(flash[:alert]).to eq('セッションが切れました。再度ログインしてください。')
-      end
-    end
-  end
-
-  describe '#not_authenticated' do
-    it 'redirects to operator_cat_in_path' do
       get :protected_action
+
+      expect(response.body).to eq("protected for #{operator.email}")
+    end
+
+    it 'ログインしていなければログイン画面へ促す' do
+      get :protected_action
+
       expect(response).to redirect_to(operator_cat_in_path)
-    end
-
-    it 'sets alert message with translation' do
-      get :protected_action
       expect(flash[:alert]).to eq('セッションが切れました。再度ログインしてください。')
     end
 
-    context 'when I18n translation is customized' do
+    context 'when 文言を差し替えたとき' do
       before do
         I18n.backend.store_translations(:ja, authentication: { errors: { session_expired: 'カスタムメッセージ' } })
       end
 
-      after do
-        I18n.backend.reload!
-      end
+      after { I18n.backend.reload! }
 
-      it 'uses custom I18n translation' do
+      it '差し替えた文言を使う' do
         get :protected_action
+
         expect(flash[:alert]).to eq('カスタムメッセージ')
       end
     end
   end
 
-  describe '#set_current_operator (private)' do
-    context 'when operator_id exists in session' do
-      before do
-        controller.session[:operator_id] = operator.id
-      end
-
-      it 'sets @current_operator from session' do
-        controller.send(:set_current_operator)
-        expect(controller.instance_variable_get(:@current_operator)).to eq(operator)
-      end
-
-      it 'queries database only once (memoization)' do
-        controller.send(:set_current_operator)
-        expect(Operator).not_to receive(:find_by)
-        controller.send(:set_current_operator)
-      end
-    end
-
-    context 'when operator_id does not exist in session' do
-      it 'does not set @current_operator' do
-        controller.send(:set_current_operator)
-        expect(controller.instance_variable_get(:@current_operator)).to be_nil
-      end
-    end
-
-    context 'when operator_id is invalid' do
-      before do
-        controller.session[:operator_id] = 99_999
-      end
-
-      it 'resets session' do
-        controller.send(:set_current_operator)
-        expect(controller.session[:operator_id]).to be_nil
-      end
-
-      it 'returns nil' do
-        result = controller.send(:set_current_operator)
-        expect(result).to be_nil
-      end
-    end
-  end
-
-  describe 'helper methods' do
-    it 'makes current_operator available in views' do
-      expect(controller.class._helper_methods).to include(:current_operator)
-    end
-
-    it 'makes operator_signed_in? available in views' do
-      expect(controller.class._helper_methods).to include(:operator_signed_in?)
-    end
-  end
-
-  describe 'before_action :set_current_operator' do
-    before do
+  describe '#set_current_operator' do
+    it 'セッションから運用者を復元する' do
       controller.session[:operator_id] = operator.id
+
+      expect(controller.send(:set_current_operator)).to eq(operator)
     end
 
-    it 'is called before each action' do
-      expect(controller).to receive(:set_current_operator).and_call_original
-      get :public_action
+    it '一度読み込んだ運用者は問い合わせ直さない' do
+      controller.session[:operator_id] = operator.id
+      controller.send(:set_current_operator)
+
+      expect(Operator).not_to receive(:find_by)
+      controller.send(:set_current_operator)
     end
 
-    it 'sets current_operator before action' do
+    it 'セッションが空なら何もしない' do
+      expect(controller.send(:set_current_operator)).to be_nil
+    end
+
+    it '見つからない運用者のセッションは破棄する' do
+      controller.session[:operator_id] = 99_999
+
+      expect(controller.send(:set_current_operator)).to be_nil
+      expect(controller.session[:operator_id]).to be_nil
+    end
+
+    it 'アクションの前に呼ばれる' do
+      controller.session[:operator_id] = operator.id
+
       get :public_action
+
       expect(controller.current_operator).to eq(operator)
     end
   end
 
-  describe 'session fixation protection' do
-    it 'prevents session fixation on login' do
-      # Set up a session with some data
-      controller.session[:malicious_data] = 'hacker_value'
-      controller.session.id
-
-      # Login should reset the session
-      controller.login(operator)
-
-      # Session should be reset
-      expect(controller.session[:malicious_data]).to be_nil
-      expect(controller.session[:operator_id]).to eq(operator.id)
+  describe 'ビューへ公開するメソッド' do
+    it 'current_operator を使える' do
+      expect(controller.class._helper_methods).to include(:current_operator)
     end
 
-    it 'prevents session fixation on logout' do
-      controller.login(operator)
-      controller.session[:some_data] = 'value'
-
-      controller.logout
-
-      expect(controller.session[:operator_id]).to be_nil
-      expect(controller.session[:some_data]).to be_nil
-    end
-  end
-
-  describe 'integration with BruteForceProtection' do
-    let(:locked_operator) do
-      create(:operator, password: 'Password123', password_confirmation: 'Password123').tap do |op|
-        op.update(
-          lock_expires_at: 1.hour.from_now,
-          failed_logins_count: 5
-        )
-      end
-    end
-
-    let(:auth_result_locked_operator) do
-      AuthResult.failed(:account_locked, user: locked_operator)
-    end
-
-    before do
-      allow(AuthenticationService).to receive(:authenticate)
-        .and_return(auth_result_locked_operator)
-      allow(locked_operator).to receive(:mail_notice)
-    end
-
-    it 'sends notification when locked account attempts login' do
-      expect(locked_operator).to receive(:mail_notice).with(request_ip)
-      controller.authenticate_operator('locked@example.com', 'password123')
+    it 'operator_signed_in? を使える' do
+      expect(controller.class._helper_methods).to include(:operator_signed_in?)
     end
   end
 end
