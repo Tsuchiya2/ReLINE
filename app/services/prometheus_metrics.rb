@@ -9,6 +9,9 @@
 #   PrometheusMetrics.track_webhook_request('success')
 #   PrometheusMetrics.track_event_success(event)
 module PrometheusMetrics
+  # Provider label for authentication metrics
+  PASSWORD_PROVIDER = 'password'
+
   class << self
     # Track webhook processing duration
     #
@@ -71,6 +74,23 @@ module PrometheusMetrics
       return unless defined?(MESSAGE_SEND_TOTAL)
 
       MESSAGE_SEND_TOTAL.increment(labels: { status: status })
+    end
+
+    # Track authentication attempt
+    #
+    # @param result [Symbol] :success or :failed
+    # @param reason [Symbol, nil] Failure reason
+    # @param duration [Float, nil] Duration in seconds
+    def track_authentication(result, reason: nil, duration: nil)
+      return unless defined?(AUTH_ATTEMPTS_TOTAL)
+
+      AUTH_ATTEMPTS_TOTAL.increment(labels: { provider: PASSWORD_PROVIDER, result: result })
+      AUTH_DURATION.observe(duration, labels: { provider: PASSWORD_PROVIDER }) if duration
+
+      return if reason.blank?
+
+      AUTH_FAILURES_TOTAL.increment(labels: { provider: PASSWORD_PROVIDER, reason: reason })
+      AUTH_LOCKED_ACCOUNTS_TOTAL.increment(labels: { provider: PASSWORD_PROVIDER }) if reason == :account_locked
     end
 
     # Update LINE groups count gauge

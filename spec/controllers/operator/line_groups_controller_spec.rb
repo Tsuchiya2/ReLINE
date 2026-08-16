@@ -27,13 +27,13 @@ RSpec.describe Operator::LineGroupsController, type: :controller do
   end
 
   describe 'authentication with an invalid session' do
-    it 'resets the session and redirects to login when the operator lookup raises RecordNotFound' do
+    it 'resets the session and redirects to login when the operator no longer exists' do
       session[:operator_id] = 999
-      allow(Operator).to receive(:find_by).and_raise(ActiveRecord::RecordNotFound)
 
       delete :destroy, params: { id: 1 }
 
       expect(response).to redirect_to(operator_cat_in_path)
+      expect(session[:operator_id]).to be_nil
     end
   end
 end

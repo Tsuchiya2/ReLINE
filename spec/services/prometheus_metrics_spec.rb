@@ -93,6 +93,45 @@ RSpec.describe PrometheusMetrics do
     end
   end
 
+  describe '.track_authentication' do
+    let(:provider) { described_class::PASSWORD_PROVIDER }
+
+    it 'increments the attempt counter when the metric is defined' do
+      expect(AUTH_ATTEMPTS_TOTAL).to receive(:increment).with(labels: { provider: provider, result: :success })
+
+      described_class.track_authentication(:success)
+    end
+
+    it 'observes the duration when it is given' do
+      allow(AUTH_ATTEMPTS_TOTAL).to receive(:increment)
+      expect(AUTH_DURATION).to receive(:observe).with(0.2, labels: { provider: provider })
+
+      described_class.track_authentication(:success, duration: 0.2)
+    end
+
+    it 'increments the failure counter with the reason' do
+      allow(AUTH_ATTEMPTS_TOTAL).to receive(:increment)
+      expect(AUTH_FAILURES_TOTAL).to receive(:increment).with(
+        labels: { provider: provider, reason: :invalid_credentials }
+      )
+
+      described_class.track_authentication(:failed, reason: :invalid_credentials)
+    end
+
+    it 'counts locked accounts separately' do
+      allow(AUTH_ATTEMPTS_TOTAL).to receive(:increment)
+      allow(AUTH_FAILURES_TOTAL).to receive(:increment)
+      expect(AUTH_LOCKED_ACCOUNTS_TOTAL).to receive(:increment).with(labels: { provider: provider })
+
+      described_class.track_authentication(:failed, reason: :account_locked)
+    end
+
+    it 'returns nil when the metric is undefined' do
+      hide_const('AUTH_ATTEMPTS_TOTAL')
+      expect(described_class.track_authentication(:success)).to be_nil
+    end
+  end
+
   describe '.update_group_count' do
     it 'sets the gauge when the metric is defined' do
       expect(LINE_GROUPS_TOTAL).to receive(:set).with(42)
