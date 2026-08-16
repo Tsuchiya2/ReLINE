@@ -5,7 +5,6 @@
 [![Ruby](https://img.shields.io/badge/Ruby-4.0.5-CC342D?style=flat&logo=ruby&logoColor=white)](https://www.ruby-lang.org/)
 [![Rails](https://img.shields.io/badge/Rails-8.1.3-CC0000?style=flat&logo=ruby-on-rails&logoColor=white)](https://rubyonrails.org/)
 [![LINE](https://img.shields.io/badge/LINE-Messaging_API-00C300?style=flat&logo=line&logoColor=white)](https://developers.line.biz/en/services/messaging-api/)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 **かわいい猫の仲間と一緒に、LINEグループを活性化しましょう！**
 
@@ -27,7 +26,8 @@
 - 💬 **スマートメッセージ配信** - 最適なタイミングで文脈に応じた会話のきっかけを送信
 - 📊 **管理ダッシュボード** - グループの管理とエンゲージメント指標の監視
 - 🔐 **セキュアな認証** - ロールベースの権限による保護された管理者アクセス
-- 📈 **分析とインサイト** - 会話復活の成功率を追跡
+- 📱 **PWA対応** - インストール可能・オフライン対応のWebフロントエンド
+- 📈 **可観測性** - ヘルスチェック / Prometheusメトリクス / 構造化ログ
 
 ---
 
@@ -66,7 +66,7 @@
 - **レート制限** - `rack-attack` - ブルートフォース攻撃対策とリクエストスロットリング
 - **メッセージング** - `line-bot-api` - LINE Messaging API連携
 - **監視** - `prometheus-client` - メトリクス収集と監視
-- **ログ** - `lograge` - 本番環境向け構造化ログ
+- **ログ** - `lograge` + `request_store` - 相関IDつき構造化ログ
 
 #### 開発・テスト
 
@@ -75,7 +75,7 @@
 - **コード品質** - `rubocop`（Rails、Performance、RSpec拡張付き）
 - **テストデータ** - `factory_bot_rails`、`faker` - ファクトリとフィクスチャ生成
 - **セキュリティ** - `brakeman`、`bundler-audit` - セキュリティ脆弱性スキャン
-- **カバレッジ** - `simplecov` - テストカバレッジ分析（88%閾値）
+- **カバレッジ** - `simplecov` - `COVERAGE=true`または`CI=true`での実行時に計測し、行・ブランチともに100%を必須とする
 
 ### フロントエンド
 
@@ -85,6 +85,7 @@
 | ![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-F7DF1E?style=flat&logo=javascript&logoColor=black) | クライアントサイドインタラクティビティ |
 | ![Stimulus](https://img.shields.io/badge/Stimulus-Hotwire-FF6600?style=flat) | JavaScriptフレームワーク |
 | ![Turbo](https://img.shields.io/badge/Turbo-Hotwire-FF6600?style=flat) | SPA風ナビゲーション |
+| ![Jest](https://img.shields.io/badge/Jest-30-C21325?style=flat&logo=jest&logoColor=white) | Service Workerモジュールのユニットテスト |
 
 #### アセットパイプライン
 
@@ -115,25 +116,59 @@
 - **シンコントローラー** - 責務を委譲した最小限のコントローラーロジック
 - **Rubocop準拠** - 可読性を損なうことなく厳格なスタイルガイドラインに準拠
 
+主要なサービスは以下のとおりです。
+
+| クラス | 責務 |
+|--------|------|
+| `Line::EventProcessor` | Webhookイベントのオーケストレーション |
+| `Line::GroupService` | グループの参加・退出などライフサイクル管理 |
+| `Line::CommandHandler` | 特殊コマンドの処理 |
+| `Line::OneOnOneHandler` | 1対1トークの処理 |
+| `Line::ClientAdapter` / `Line::ClientProvider` | LINE SDKの抽象化とクライアント供給 |
+| `Webhooks::SignatureValidator` | 署名検証（タイミング攻撃対策付き） |
+| `Resilience::RetryHandler` | 指数バックオフによるリトライ |
+| `ErrorHandling::MessageSanitizer` | ログ・通知からの資格情報の除去 |
+
+### 認証アーキテクチャ
+
+Sorceryからの移行後、認証はRails 8標準の`has_secure_password`をベースにしたプロバイダー抽象で構成されています。
+
+- `Authentication::Provider` - 認証プロバイダーの共通インターフェース
+- `Authentication::PasswordProvider` - パスワード認証の実装
+- `AuthenticationService` / `AuthResult` - 認証処理とその結果オブジェクト
+- `SessionManager` - セッションの生成・失効管理
+- `BruteForceProtection` - 失敗回数によるアカウントロック
+
+### PWA
+
+Webフロントエンドはインストール可能なPWAとして動作します。
+
+- **Service Worker** - `app/javascript/serviceworker.js`（esbuildで`public/serviceworker.js`へバンドル）
+- **キャッシュ戦略** - `cache-first` / `network-first` / `network-only` を`StrategyRouter`が振り分け
+- **設定の外部化** - `config/pwa_config.yml`で環境ごとのキャッシュ戦略・マニフェストを定義し、`GET /api/pwa/config`で配信
+- **マニフェスト** - `GET /manifest.json`をI18n対応で動的生成
+- **オフライン表示** - `public/offline.html`
+- **クライアント計測** - `POST /api/client_logs`・`POST /api/metrics`でブラウザ側のログ／メトリクスを収集
+
+### 監視エンドポイント
+
+| エンドポイント | 用途 |
+|----------------|------|
+| `GET /health` | Liveness用の軽量チェック |
+| `GET /health/deep` | DB接続とディスク空き容量を含む詳細チェック |
+| `GET /health/ready` | Readiness用のDB接続チェック |
+| `GET /metrics` | Prometheusテキスト形式のメトリクス（本番はBasic認証） |
+
 ---
 
-## 📊 テストカバレッジ
+## 📊 テスト
 
-- **モデルスペック** - ビジネスロジックの包括的なユニットテスト
-- **システムスペック** - **Selenium**によるエンドツーエンド統合テスト
-- **RSpec** - 主要テストフレームワーク
-- **SimpleCov** - カバレッジレポート（88%閾値）
-- **Selenium** - ヘッドレスChromeによるブラウザ自動化
+- **RSpec** - モデル / サービス / リクエスト / システムスペックを網羅
+- **SimpleCov** - `COVERAGE=true`または`CI=true`での実行時のみ計測され、行・ブランチともに100%を下回るとテストが失敗（通常の`bundle exec rspec`では計測されません）
+- **Selenium** - ヘッドレスChromeによるシステムテスト
+- **Jest** - Service Workerモジュール（`app/javascript/pwa/**`）のユニットテスト
 
-### テストインフラストラクチャ
-
-テストインフラストラクチャは、システムテストにSeleniumとヘッドレスChromeを使用し、以下を提供します：
-- 🚀 **ヘッドレスChrome** - CI/CD環境での高速実行
-- 📸 **自動スクリーンショット** - テスト失敗時にキャプチャ
-- 🔄 **Capybara連携** - シームレスなRails統合
-- 🌐 **クロスプラットフォーム** - 環境間で一貫した動作
-
-詳細なテストドキュメントは[TESTING.md](TESTING.md)を参照してください。
+テストコマンドやカバレッジ設定の詳細は[TESTING.md](TESTING.md)を参照してください。
 
 ---
 
@@ -149,13 +184,56 @@
 1. **リポジトリをクローン**
 
 ```bash
-git clone https://github.com/yourusername/cat_salvages_the_relationship.git
-cd cat_salvages_the_relationship
+git clone https://github.com/Tsuchiya2/ReLINE.git
+cd ReLINE
 ```
 
-2. **環境変数を設定**
+2. **環境変数と資格情報を設定**
 
-`.env`ファイルを作成するか、`config/credentials.yml.enc`にLINE APIキーを設定します。
+`.env.example`をコピーして`.env`を作成します。
+
+```bash
+cp .env.example .env
+```
+
+LINEのチャネル情報やWebhookのコールバックパスはRailsの暗号化credentialsで管理します。
+`config/routes.rb`が`credentials.callback_route`を参照するため、**アプリケーションを起動する前に**設定してください。
+
+まだコンテナを起動していないため、`exec`ではなく`run --rm`でワンショット実行します。
+
+```bash
+docker compose run --rm -e EDITOR=vi web bin/rails credentials:edit
+```
+
+> すでに`docker compose up`でコンテナが起動している場合は
+> `docker compose exec -e EDITOR=vi web bin/rails credentials:edit` でも編集できます。
+
+必要なキーは以下のとおりです。
+
+```yaml
+# LINE Messaging API
+channel_id: YOUR_CHANNEL_ID
+channel_secret: YOUR_CHANNEL_SECRET
+channel_token: YOUR_CHANNEL_TOKEN
+callback_route: your_webhook_path   # POST /operator/<callback_route> になります
+
+# db:seed で使用する初期データ
+guest:
+  email: guest@example.com
+  password: your_guest_password
+operator:
+  email: operator@example.com
+  password: your_operator_password
+content:
+  movie: https://example.com/movie
+alarmcontent:
+  url: https://example.com/alarm
+
+# 本番のメール送信（config/environments/production.rb）
+gmail:
+  user_name: your_email@gmail.com
+  password: your_app_password
+```
 
 3. **アプリケーションを起動**
 
@@ -168,6 +246,13 @@ docker compose up
 - Railsアプリケーションがビルドされ起動
 - [http://localhost:3000](http://localhost:3000)でアプリが実行
 
+4. **データベースを準備**
+
+```bash
+docker compose exec web bin/rails db:create db:schema:load
+docker compose exec web bin/rails db:seed
+```
+
 **便利なDockerコマンド：**
 
 ```bash
@@ -179,9 +264,6 @@ docker compose logs -f web
 
 # Railsコンソールを実行
 docker compose exec web bin/rails console
-
-# テストを実行
-docker compose exec web bundle exec rspec
 
 # コンテナを停止
 docker compose down
@@ -198,6 +280,9 @@ docker compose exec web bash -c "COVERAGE=true bundle exec rspec"
 # システムテストのみを実行
 docker compose exec web bundle exec rspec spec/system
 
+# JavaScript（Service Worker）のテストを実行
+docker compose exec web npm test
+
 # コード品質チェック
 docker compose exec web bundle exec rubocop
 
@@ -210,6 +295,18 @@ docker compose exec web bin/rails routes
 ```
 
 詳細なテストコマンドとオプションは[TESTING.md](TESTING.md)を参照してください。
+
+### ⏰ 定期実行タスク
+
+グループへの働きかけはRakeタスクとして提供されています。cronなどのスケジューラから実行してください。
+
+```bash
+# 短いスパンでの働きかけ（Scheduler.call_notice）
+docker compose exec web bin/rails call_notice:call_reminds
+
+# 不定期な働きかけ（Scheduler.wait_notice）
+docker compose exec web bin/rails wait_notice:wait_reminds
+```
 
 ---
 
@@ -237,7 +334,16 @@ docker compose exec web bin/rails routes
 
 ## 📚 リソース
 
-### ドキュメント
+### プロジェクトドキュメント
+
+- [ドキュメント一覧](docs/README.md) - `docs/`配下の案内
+- [TESTING.md](TESTING.md) - テストの実行方法とカバレッジ方針
+- [CHANGELOG.md](CHANGELOG.md) - 変更履歴
+- [docs/MIGRATION_GUIDE.md](docs/MIGRATION_GUIDE.md) - LINE Bot SDK v2への移行手順
+- [docs/observability/authentication-monitoring.md](docs/observability/authentication-monitoring.md) - 認証まわりの監視設計
+- [docs/deployment/ROLLBACK.md](docs/deployment/ROLLBACK.md) - 認証移行のロールバック手順
+
+### 外部ドキュメント
 
 - [LINE Messaging APIドキュメント](https://developers.line.biz/ja/docs/messaging-api/)
 - [Rails 8.1ガイド](https://railsguides.jp/)
@@ -254,12 +360,6 @@ docker compose exec web bin/rails routes
 3. 変更をコミット（`git commit -m 'Add some amazing feature'`）
 4. ブランチにプッシュ（`git push origin feature/amazing-feature`）
 5. プルリクエストを開く
-
----
-
-## 📄 ライセンス
-
-このプロジェクトはMITライセンスの下でライセンスされています。詳細は[LICENSE](LICENSE)ファイルを参照してください。
 
 ---
 

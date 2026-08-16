@@ -1,5 +1,14 @@
 # DataMigrationValidator Usage Guide
 
+> **⚠️ 現状の注意**
+> `operators`テーブルの`crypted_password` / `salt`はマイグレーション
+> `20251125142050_remove_sorcery_columns_from_operators.rb`で削除済みです。
+> そのため`crypted_password`を参照する`generate_checksum` / `verify_integrity` /
+> `validate_password_migration`は、**現在のOperatorテーブルに対してそのまま実行すると
+> SQLエラーになります**（`spec/services/data_migration_validator_spec.rb`はスタブ経由で検証しています）。
+> 本ドキュメントは Sorcery → `has_secure_password` 移行時の使い方の記録です。
+> 同等のツールを再利用する場合は、対象カラムを現行スキーマに合わせて調整してください。
+
 ## Overview
 
 `DataMigrationValidator` is a utility class for validating data migrations with checksums and integrity checks. It helps ensure data integrity during schema changes or data transformations.
@@ -199,21 +208,21 @@ end
 ### Migration Validation Errors
 
 **Records Lost:**
-```
+```text
 Migration validation failed: 5 records lost
 ```
 - Meaning: 5 records were deleted during migration
 - Action: Investigate why records were lost, restore from backup
 
 **Unexpected Records Added:**
-```
+```text
 Migration validation failed: 3 unexpected records added
 ```
 - Meaning: 3 new records were created during migration
 - Action: Verify if this was intentional
 
 **Records Modified:**
-```
+```text
 Migration validation failed: 10 records modified or corrupted
 ```
 - Meaning: Data in 10 records changed unexpectedly
@@ -221,7 +230,7 @@ Migration validation failed: 10 records modified or corrupted
 
 ### Password Migration Errors
 
-```
+```text
 Migration incomplete: 25 operators missing password_digest
 ```
 - Meaning: 25 operators still have crypted_password but no password_digest
@@ -282,48 +291,42 @@ Rails.logger.info "Migration validated: #{after.size} operators"
 Run the test suite:
 
 ```bash
-bundle exec rspec spec/services/data_migration_validator_spec.rb
+docker compose exec web bundle exec rspec spec/services/data_migration_validator_spec.rb
 ```
 
 Expected output:
-```
+```text
 DataMigrationValidator
   .generate_checksum
-    generates checksums for all records
-    generates SHA256 checksums
-    generates consistent checksums for same data
-    generates different checksums when data changes
+    returns one checksum per record
+    returns SHA256 hex digests
+    is deterministic for identical data
+    produces different checksums when the underlying data differs
   .validate_migration
-    when checksums match
-      returns true
-    when records are lost
-      raises error with missing count
-    when unexpected records are added
-      raises error with added count
-    when records are modified
-      raises error about modified records
-    when order changes but data is same
-      returns true
+    returns true when checksums are identical
+    returns true when the order changes but the data is the same
+    raises when records are lost
+    raises when unexpected records are added
+    raises when records are modified but the count is unchanged
   .verify_integrity
-    when all records have valid authentication data
-      returns valid result
-    when records have missing authentication data
-      reports missing authentication data
-    when records have duplicate authentication methods
-      reports duplicate authentication methods
+    when there are no integrity issues
+      reports a valid result
+    when records are missing authentication data
+      reports the missing authentication data issue
+    when records have both authentication methods
+      reports the duplicate authentication issue
   .validate_password_migration
-    when all operators have password_digest
+    when every operator has a password_digest
       returns true
-    when operators are missing password_digest
-      raises error with missing count
-    when operators only have password_digest
-      returns true
+    when some operators are missing a password_digest
+      raises with the missing count
 
-15 examples, 0 failures
+14 examples, 0 failures
 ```
 
 ## Related Documentation
 
-- [Password Migration Task](../plans/password-migration-tasks.md)
+- [Rails 8 Authentication Migration Tasks](../plans/rails8-authentication-migration-tasks.md)
+- [Rollback Procedure](../deployment/ROLLBACK.md)
 - [Operator Model](../../app/models/operator.rb)
-- [Migration Guide](../migration-guide.md)
+- [LINE Bot SDK Migration Guide](../MIGRATION_GUIDE.md)

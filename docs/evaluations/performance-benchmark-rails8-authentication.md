@@ -788,10 +788,10 @@ performance_benchmark_evaluation:
 ## References
 
 ### Internal Documentation
-- [Rails 8 Authentication Migration Design](/Users/yujitsuchiya/cat_salvages_the_relationship/docs/designs/rails8-authentication-migration.md)
-- [Rails 8 Authentication Migration Tasks](/Users/yujitsuchiya/cat_salvages_the_relationship/docs/plans/rails8-authentication-migration-tasks.md)
-- [Authentication Monitoring and Observability](/Users/yujitsuchiya/cat_salvages_the_relationship/docs/observability/authentication-monitoring.md)
-- [Code Performance Evaluation](/Users/yujitsuchiya/cat_salvages_the_relationship/docs/evaluations/code-performance-rails8-authentication.md)
+- [Rails 8 Authentication Migration Design](../designs/rails8-authentication-migration.md)
+- [Rails 8 Authentication Migration Tasks](../plans/rails8-authentication-migration-tasks.md)
+- [Authentication Monitoring and Observability](../observability/authentication-monitoring.md)
+- [Code Performance Evaluation](code-performance-rails8-authentication.md)
 
 ### External Resources
 - [k6 Load Testing Guide](https://k6.io/docs/)

@@ -2,8 +2,9 @@
 
 **Project**: ReLINE - Cat Relationship Manager
 **Date**: 2025-11-29
+**Last Reviewed**: 2026-08-16
 **Environment**: Development (localhost:3000)
-**Rails Version**: 8.1
+**Rails Version**: 8.1.3
 **PWA Implementation**: Complete
 
 ---
@@ -187,7 +188,7 @@ Additional features that improve the PWA experience and score:
 - **Service Worker**: Pre-caches critical assets during installation
 - **Caching Strategy**: Cache-first for static assets
 - **Network Timeout**: 3 seconds for network-first requests
-- **Asset Pipeline**: Webpacker 5.0 with minification
+- **Asset Pipeline**: Propshaft + jsbundling-rails (esbuild) / cssbundling-rails (Sass)
 
 **Pre-cached Assets**:
 - Homepage (`/`)
@@ -222,7 +223,7 @@ Additional features that improve the PWA experience and score:
 
 **Status**: ✅ **IMPLEMENTED**
 
-- **Framework**: Bootstrap 5.1.3 (responsive grid system)
+- **Framework**: Bootstrap 5.3.8 (responsive grid system)
 - **Container**: `container-fluid` with responsive breakpoints
 - **Layout**: Mobile-first design approach
 
@@ -263,7 +264,7 @@ Additional features that improve the PWA experience and score:
 6. **Error Handling**: Graceful fallbacks at every layer
 
 **Code Organization**:
-```
+```text
 app/javascript/pwa/
 ├── config_loader.js           # Loads config from backend API
 ├── lifecycle_manager.js       # Handles install/activate events
@@ -364,7 +365,7 @@ Add app shortcuts for quick actions:
 **Target**: Strict CSP for PWA
 
 Ensure these headers in production:
-```
+```http
 Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'
 X-Content-Type-Options: nosniff
 X-Frame-Options: DENY
@@ -378,7 +379,7 @@ X-Frame-Options: DENY
 
 **Prerequisites**:
 - Chrome/Edge browser (latest version)
-- Development server running (`rails server`)
+- Development server running (`docker compose up`)
 
 **Steps**:
 

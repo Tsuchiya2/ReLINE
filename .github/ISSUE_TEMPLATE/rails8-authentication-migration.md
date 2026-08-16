@@ -22,8 +22,8 @@ Migrate from the unmaintained Sorcery gem to Rails 8's built-in authentication s
 
 ## 📚 Documentation
 
-- **Design Document**: [`docs/designs/rails8-authentication-migration.md`](../docs/designs/rails8-authentication-migration.md) (3,703 lines, iteration 2)
-- **Task Plan**: [`docs/plans/rails8-authentication-migration-tasks.md`](../docs/plans/rails8-authentication-migration-tasks.md) (44 tasks, revision 2)
+- **Design Document**: [`docs/designs/rails8-authentication-migration.md`](../../docs/designs/rails8-authentication-migration.md) (3,703 lines, iteration 2)
+- **Task Plan**: [`docs/plans/rails8-authentication-migration-tasks.md`](../../docs/plans/rails8-authentication-migration-tasks.md) (44 tasks, revision 2)
 - **Design Evaluations**: `docs/evaluations/design-*-FEAT-AUTH-001.md` (7 evaluators, all approved ≥7.0/10.0)
 - **Planning Evaluations**: `docs/evaluations/planner-*-FEAT-AUTH-001.md` (7 evaluators, all approved ≥4.3/5.0)
 

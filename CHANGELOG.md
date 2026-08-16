@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed - Documentation Sync (2026-08-16)
+
+- README / CHANGELOG / `.env.example` / 各ガイドを現行実装に合わせて更新
+- `TESTING.md` と `docs/README.md`（ドキュメント索引）を追加
+- 採用されなかった Playwright ベースのテスト基盤（FEAT-GHA-001）の設計・計画・評価ドキュメントを削除
+
+### Changed - Test Coverage 100% (2026-07-12)
+
+- SimpleCov の閾値を行・ブランチともに **100%** に引き上げ（`spec/rails_helper.rb`）
+- 分岐カバレッジ計測（`enable_coverage :branch`）を有効化
+
 ### Changed - Ruby 4.0 / Rails 8.1.3 Upgrade (2026-07-12)
 
 #### Runtime & Framework
@@ -21,6 +32,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Verified
 - RSpec: 715 examples, 0 failures
 - RuboCop: 145 files, no offenses
+
+### Added - Auto Release Workflow (2025-12)
+
+- `main` へのマージ時にパッチバージョンのタグと GitHub Release を自動作成する `.github/workflows/release.yml` を追加
+
+### Added - Progressive Web App (2025-11-29)
+
+#### New Features
+- **Service Worker**: `app/javascript/serviceworker.js` を esbuild で `public/serviceworker.js` にバンドル
+- **キャッシュ戦略**: `CacheFirstStrategy` / `NetworkFirstStrategy` / `NetworkOnlyStrategy` を `StrategyRouter` がURLパターンで振り分け
+- **ライフサイクル管理**: `LifecycleManager` によるプリキャッシュと旧キャッシュの削除
+- **動的マニフェスト**: `GET /manifest.json`（`ManifestsController`）をI18n対応で生成
+- **PWA設定の外部化**: `config/pwa_config.yml` を環境別に定義し `GET /api/pwa/config` で配信
+- **オフラインページ**: `public/offline.html`
+- **インストールプロンプト**: `install_prompt_manager.js` による「ホーム画面に追加」制御
+- **クライアント計測**: `POST /api/client_logs` / `POST /api/metrics`（`client_logs` / `metrics` テーブルを追加）
+
+#### Testing
+- Jest（jsdom）による Service Worker モジュールのユニットテストを追加（閾値80%）
+- Capybara + Selenium による PWA システムテスト（`spec/system/pwa_offline_spec.rb`）を追加
+
+### Changed - Rails 8 Authentication Migration (2025-11-26)
+
+#### Breaking Changes (内部実装)
+- 認証を Sorcery から Rails 8 標準の `has_secure_password` に移行し、`sorcery` gem を削除
+- `operators` テーブルから `crypted_password` / `salt` を削除し `password_digest` を追加
+
+#### New Features
+- **プロバイダー抽象**: `Authentication::Provider` / `Authentication::PasswordProvider`
+- **サービス層**: `AuthenticationService` / `AuthResult` / `SessionManager`
+- **ブルートフォース対策**: `BruteForceProtection` concern によるアカウントロック
+- **レート制限**: `rack-attack` によるログイン・パスワードリセットのスロットリング
+- **ヘルスチェック**: `GET /health/ready` を追加
+- **認証メトリクス**: `auth_attempts_total` / `auth_duration_seconds` / `auth_failures_total` / `auth_locked_accounts_total` / `auth_active_sessions`
+- **リクエスト相関**: `RequestCorrelation` ミドルウェアによる `X-Request-ID` の伝播
+- **移行検証**: `DataMigrationValidator` / `PasswordMigrator`
+
+#### Configuration
+- `config/initializers/authentication.rb` を追加（`AUTH_*` 環境変数で設定を上書き可能）
+- `config/initializers/rack_attack.rb` を追加
+
+### Changed - MySQL 8 Unification (2025-11)
+
+- 開発・テスト・本番の全環境を MySQL 8.0 に統一（`config/database.yml` / `docker-compose.yml`）
 
 ### Added - LINE Bot SDK Modernization (2025-11-17)
 
@@ -128,10 +183,6 @@ See [MIGRATION_GUIDE.md](docs/MIGRATION_GUIDE.md) for detailed migration instruc
 
 ## Previous Releases
 
-(Add previous release notes here)
-
----
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>
+2025-11-17 より前の変更履歴は記録されていません。詳細は
+[コミット履歴](https://github.com/Tsuchiya2/ReLINE/commits/main) と
+[リリース一覧](https://github.com/Tsuchiya2/ReLINE/releases) を参照してください。

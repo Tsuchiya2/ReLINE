@@ -57,14 +57,10 @@ bundle exec rspec spec/system/pwa_offline_spec.rb
 ### Run Specific Test Groups
 
 ```bash
-# Service Worker Registration tests only
-bundle exec rspec spec/system/pwa_offline_spec.rb:28
-
-# Cache Management tests only
-bundle exec rspec spec/system/pwa_offline_spec.rb:258
-
-# Error Handling tests only
-bundle exec rspec spec/system/pwa_offline_spec.rb:323
+# describe 名でフィルタするのが確実です（行番号は変動します）
+bundle exec rspec spec/system/pwa_offline_spec.rb -e 'Service Worker Registration'
+bundle exec rspec spec/system/pwa_offline_spec.rb -e 'Cache Management'
+bundle exec rspec spec/system/pwa_offline_spec.rb -e 'Error Handling'
 ```
 
 ### Run With Offline Tests Enabled
@@ -85,8 +81,8 @@ bundle exec rspec spec/system/pwa_offline_spec.rb --format documentation
 
 ### Prerequisites
 
-1. **Chrome Browser** - Required for Selenium WebDriver
-2. **ChromeDriver** - Automatically managed by `webdrivers` gem
+1. **Chrome / Chromium** - Required for Selenium WebDriver
+2. **chromedriver** - `/usr/bin/chromedriver`が存在すればそれを使用し、無ければSelenium Managerが自動解決します（`spec/support/capybara.rb`）。Dockerイメージには`chromium`と`chromium-driver`が同梱されています
 3. **Service Worker Support** - Modern Chrome/Chromium version
 
 ### Capybara Drivers
@@ -297,6 +293,6 @@ For issues or questions about PWA testing:
 
 ---
 
-**Last Updated**: 2025-11-29
+**Last Updated**: 2026-08-16
 **Test Framework**: RSpec + Capybara + Selenium WebDriver
-**Browser**: Chrome (Headless)
+**Browser**: Chrome / Chromium (Headless)
