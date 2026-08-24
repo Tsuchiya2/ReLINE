@@ -21,6 +21,40 @@ html {
   scroll-padding-top: var(--reline-navbar-height);
 }
 
+.fade-in {
+  opacity: 0;
+  transition-duration: 1000ms;
+  transition-property: opacity, transform;
+}
+
+.fade-in-up {
+  transform: translate(0, 50px);
+}
+
+.scroll-in {
+  opacity: 1;
+  transform: translate(0, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in {
+    opacity: 1;
+    transition: none;
+  }
+
+  .fade-in-up {
+    transform: none;
+  }
+}
+
+.web-font {
+  font-family: 'Hachi Maru Pop', cursive;
+}
+
+.meiryo-font {
+  font-family: Meiryo, sans-serif;
+}
+
 .feedback-input {
   resize: none;
   height: 280px;
