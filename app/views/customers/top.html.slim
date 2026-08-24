@@ -34,13 +34,5 @@ h1.mt-5
   .mb-5
     | デフォルトに戻したい場合は<br>"Would you set to default."<br>と投稿してください🖍
 
-.fade-in.fade-in-up.usage-section.my-5
-  .h4.mt-5
-    | もし働きかけを止めたいときは
-  .h4.mt-5
-    | "Cat sleeping on our Memory."
-  .h4.mt-5
-    | と投稿してください🐾
-
-.usage-section.my-5
-  = image_tag 'undraw_friends_r511.webp', class: 'img-fluid', alt: ''
+= render 'usage_section', lines: [['もし働きかけを止めたいときは'], ['"Cat sleeping on our Memory."'], ['と投稿してください🐾']],
+                          image: 'undraw_friends_r511.webp', reverse: true
