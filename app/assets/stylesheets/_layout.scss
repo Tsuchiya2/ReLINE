@@ -1,0 +1,27 @@
+$reline-navbar-height: 3.5rem;
+$reline-navbar-height-lg: 4rem;
+
+:root {
+  --reline-navbar-height: #{$reline-navbar-height};
+
+  @include media-breakpoint-up(lg) {
+    --reline-navbar-height: #{$reline-navbar-height-lg};
+  }
+}
+
+.navbar.fixed-top {
+  min-height: var(--reline-navbar-height);
+}
+
+body {
+  padding-top: var(--reline-navbar-height);
+}
+
+html {
+  scroll-padding-top: var(--reline-navbar-height);
+}
+
+.feedback-input {
+  resize: none;
+  height: 280px;
+}
