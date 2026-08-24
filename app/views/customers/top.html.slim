@@ -8,37 +8,23 @@ h1.mt-5
 .special_thanks.mt-2.mb-5
   | 猫さんのイラスト協力：Sapico様
 
-/ ===== 使い方に関して(フェードイン方式) =====
-.fade-in.fade-in-up.col-md-6.offset-md-3
-  .h4.mt-5
-    | あの日を最後に<br>連絡が途切れた人はいませんか？
-  .usage-images.my-5
-    = image_tag 'undraw_true_friends_c94g.webp', class: 'img-fluid'
-.fade-in.fade-in-up.col-md-6.offset-md-3
-  .h4.mt-5
-    | 猫さんが<br>間を取り持つ手助けをします。
-  .usage-images.my-5
-    = image_tag 'undraw_connection_b38q.webp', class: 'img-fluid'
-.fade-in.fade-in-up.col-md-6.offset-md-3
-  .h4.mt-5
+= render 'usage_section', lines: [['あの日を最後に', '連絡が途切れた人はいませんか？']],
+                          image: 'undraw_true_friends_c94g.webp'
+= render 'usage_section', lines: [['猫さんが', '間を取り持つ手助けをします。']],
+                          image: 'undraw_connection_b38q.webp', reverse: true
+
+.fade-in.fade-in-up.usage-section.my-5
+  .h4
     | 具体的な操作は2つだけ
-.fade-in.fade-in-up.col-md-6.offset-md-3
-  .h4.mt-5
-    | 1.猫さんをLINEの友だちに追加
-  .usage-images.my-5
-    = image_tag 'undraw_Following_re_d5aa.webp', class: 'img-fluid'
-.fade-in.fade-in-up.col-md-6.offset-md-3
-  h4.mt-5
-    | 2.猫さんをグループに加える
-  .usage-images.my-5
-    = image_tag 'undraw_Chatting_re_j55r.webp', class: 'img-fluid'
-.fade-in.fade-in-up.col-md-6.offset-md-3
-  .h4.mt-5
-    | "2"まで完了すると…
-  .h4.mt-5
-    | 最後の投稿から<br>3週間〜2ヶ月後に<br>猫さんがLINEします。
-  .usage-images.my-5
-    = image_tag 'undraw_Online_messaging_re_qft3.webp', class: 'img-fluid'
+
+= render 'usage_section', lines: [['1.猫さんをLINEの友だちに追加']],
+                          image: 'undraw_Following_re_d5aa.webp'
+= render 'usage_section', lines: [['2.猫さんをグループに加える']],
+                          image: 'undraw_Chatting_re_j55r.webp', reverse: true
+= render 'usage_section', lines: [['"2"まで完了すると…'], ['最後の投稿から', '3週間〜2ヶ月後に', '猫さんがLINEします。']],
+                          image: 'undraw_Online_messaging_re_qft3.webp'
+
+.fade-in.fade-in-up.usage-section.my-5
   .mt-5.mb-4
     | 〜 通知時期を設定したい場合 〜
   .mb-3
@@ -47,12 +33,6 @@ h1.mt-5
     | 約2ヶ月にしたい場合は<br>"Would you set to latter."
   .mb-5
     | デフォルトに戻したい場合は<br>"Would you set to default."<br>と投稿してください🖍
-.fade-in.fade-in-up.col-md-6.offset-md-3
-  .h4.mt-5
-    | もし働きかけを止めたいときは
-  .h4.mt-5
-    | "Cat sleeping on our Memory."
-  .h4.mt-5
-    | と投稿してください🐾
-.col-md-6.offset-md-3.my-5
-  = image_tag 'undraw_friends_r511.webp', class: 'img-fluid'
+
+= render 'usage_section', lines: [['もし働きかけを止めたいときは'], ['"Cat sleeping on our Memory."'], ['と投稿してください🐾']],
+                          image: 'undraw_friends_r511.webp', reverse: true

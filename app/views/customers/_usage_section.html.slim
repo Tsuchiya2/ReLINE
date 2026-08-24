@@ -1,0 +1,10 @@
+- reverse = local_assigns.fetch(:reverse, false)
+.fade-in.fade-in-up.usage-section.my-5
+  .row.align-items-center.g-4.g-lg-5
+    div class=['col-12', 'col-lg-6', ('order-lg-2' if reverse)]
+      - lines.each do |paragraph|
+        .h4.mb-0.mt-4.mt-lg-0
+          = safe_join(paragraph, tag.br)
+    div class=['col-12', 'col-lg-6', ('order-lg-1' if reverse)]
+      .usage-images
+        = image_tag image, class: 'img-fluid', alt: ''

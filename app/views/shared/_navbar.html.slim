@@ -1,26 +1,26 @@
-nav.navbar.navbar-expand-xl.navbar-dark.bg-secondary.fixed-top
-  = link_to 'ReLINE', root_path, class: 'navbar-brand ps-3'
+nav.navbar.navbar-expand-lg.navbar-dark.bg-secondary.fixed-top
+  = link_to 'ReLINE', root_path, class: 'navbar-brand ps-3', data: { turbo_preload: true }
   button.navbar-toggler.me-3 data-bs-toggle='collapse' data-bs-target="#navbarSupportedContent" aria-label="Toggle navigation"
     span.navbar-toggler-icon
   .collapse.navbar-collapse id='navbarSupportedContent'
     ul.navbar-nav.ps-3
       li.nav-item
-        = link_to root_path, class: 'nav-link my-1 mx-1 d-inline-flex align-items-center' do
+        = link_to root_path, class: 'nav-link my-1 mx-1 d-inline-flex align-items-center', data: { turbo_preload: true } do
           icon.fas.fa-home.me-2
           .guide-text
             | ホーム
       li.nav-item
-        = link_to terms_path, class: 'nav-link my-1 mx-1 d-inline-flex align-items-center' do
+        = link_to terms_path, class: 'nav-link my-1 mx-1 d-inline-flex align-items-center', data: { turbo_preload: true } do
           icon.far.fa-file.me-2
           .guide-text.ms-1
             | 利用規約
       li.nav-item
-        = link_to privacy_policy_path, class: 'nav-link my-1 mx-1 d-inline-flex align-items-center' do
+        = link_to privacy_policy_path, class: 'nav-link my-1 mx-1 d-inline-flex align-items-center', data: { turbo_preload: true } do
           icon.fas.fa-lock.me-2
           .guide-text
             | プライバシーポリシー
       li.nav-item
-        = link_to new_feedback_path, class: 'nav-link my-1 mx-1 d-inline-flex align-items-center' do
+        = link_to new_feedback_path, class: 'nav-link my-1 mx-1 d-inline-flex align-items-center', data: { turbo_preload: true } do
           icon.far.fa-comment.me-2
           .guide-text
             | フィードバック
