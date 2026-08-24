@@ -74,3 +74,32 @@ RSpec.configure do |config|
     sleep 0.1
   end
 end
+
+# Turbo DriveがDOMを差し替えている最中にCapybaraが問い合わせると、chromedriverが
+# `unknown error: unhandled inspector error: {"code":-32000,"message":"Node with
+# given id does not belong to the document"}` を返すことがある。差し替えが終われば
+# 解消する一過性のエラーだが、Capybaraの再試行対象（invalid_element_errors）に
+# UnknownErrorは含まれないため、待機せずそのまま失敗してしまう。
+# StaleElementReferenceErrorなどと同じく再試行の対象に加えて、待ち時間内であれば
+# 差し替え完了後に成功できるようにする。なお待ち時間を過ぎれば元の例外がそのまま
+# 送出されるので、本物のエラーを握り潰すことはない。
+module RetryTransientDocumentNodeError
+  TRANSIENT_MESSAGE = 'does not belong to the document'.freeze
+
+  protected
+
+  def catch_error?(error, errors = nil)
+    return true if transient_document_node_error?(error)
+
+    super
+  end
+
+  private
+
+  def transient_document_node_error?(error)
+    error.is_a?(Selenium::WebDriver::Error::UnknownError) &&
+      error.message.to_s.include?(TRANSIENT_MESSAGE)
+  end
+end
+
+Capybara::Node::Base.prepend(RetryTransientDocumentNodeError)
